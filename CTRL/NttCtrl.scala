@@ -59,109 +59,6 @@ case class twMux(num: Int) extends Component {
   io.twMuxUnit := muxRes.asBits.asUInt
 }
 
-object twMuxSim extends App {
-  val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new twMux(4))
-
-}
-
-//只对位反转得到的INTT地址在译码时会产生冲突
-//case class CtrlFail(g: NttCfg2414) extends Component {
-//  val io = new Bundle {
-//    val start = in Bool ()
-//    val isNtt = in Bool ()
-//    val idle = out Bool ()
-//    val RdAddrOri = master Flow Vec(UInt(g.Log2NttPoints bits), g.BI)
-//  }
-//  val loopCnt = Reg(UInt(log2Up(g.nttPoint / g.BI) bits)) init U(0)
-//  val stageCnt = Reg(UInt(log2Up(g.Log2NttPoints) bits)) init U(0)
-//  val OH_shifter = Reg(Bits(g.Log2NttPoints bits)) init 0
-//  val Thermal_shifter = Reg(Bits(g.Log2NttPoints bits)) init 0
-//  val constSeq = (0 until g.paraNum).map { U(_, log2Up(g.paraNum) bits) }
-//
-//  val fsm = new StateMachine {
-////    setEncoding(binaryOneHot)
-//    val IDLE = makeInstantEntry()
-//    val LOOP = new State
-//    IDLE
-//      .whenIsActive {
-//        when(io.start)(goto(LOOP))
-//      }
-//    LOOP
-//      .onEntry {
-//        OH_shifter.msb := True
-//        Thermal_shifter.msb := True
-//      }
-//      .whenIsActive {
-//        when(isNext(IDLE)) {
-//          loopCnt := 0; stageCnt := 0
-//          OH_shifter := 0; Thermal_shifter := 0
-//        } elsewhen (loopCnt === loopCnt.maxValue) {
-//          OH_shifter := OH_shifter |>> 1
-//          Thermal_shifter := (B"1'b1" ## Thermal_shifter(Thermal_shifter.high downto 1))
-//        }
-//        when(loopCnt === loopCnt.maxValue) {
-//          loopCnt := U(0)
-//        } otherwise (loopCnt := loopCnt + 1)
-//        when(loopCnt === loopCnt.maxValue) {
-//          when(stageCnt === (g.Log2NttPoints - 1)) { goto(IDLE) } otherwise { stageCnt := stageCnt + 1 }
-//        }
-//      }
-//  }
-//
-//  val subDut = new Area {
-//    val MsbPadSeq = constSeq.map { item => Cat(loopCnt.lsb, item) }
-//    val MsbPad = (B"1'b0" ## loopCnt(loopCnt.high downto 1)).asBits
-//    val LsbPadSeq = constSeq.map { item => Cat(item, B"1'b0") }
-//    val LsbPad = loopCnt.asBits
-//    val lsbMuxArray = Array.fill(g.paraNum)(new SeqMux(log2Up(g.paraNum) + 1))
-//    lsbMuxArray.toSeq.zip(MsbPadSeq.zip(LsbPadSeq)).foreach { case (dut, (t1, t2)) =>
-//      dut.io.SeqA := t1
-//      dut.io.SeqB := t2
-//      dut.io.ohSeq := OH_shifter(log2Up(g.paraNum) downto 0)
-//      dut.io.thermalSeq := Thermal_shifter(log2Up(g.paraNum) downto 0)
-//    }
-//    val msbMux = new SeqMux(g.Log2NttPoints - (log2Up(g.paraNum) + 1))
-//    msbMux.io.SeqA := MsbPad
-//    msbMux.io.SeqB := LsbPad
-//    msbMux.io.ohSeq := OH_shifter(OH_shifter.high downto (log2Up(g.paraNum) + 1))
-//    msbMux.io.thermalSeq := Thermal_shifter(OH_shifter.high downto (log2Up(g.paraNum) + 1))
-//    val ins0_subSeq = Vec(Bits(g.Log2NttPoints bits), g.paraNum)
-//    val ins1_subSeq = Vec(Bits(g.Log2NttPoints bits), g.paraNum)
-//    (ins0_subSeq.zip(ins1_subSeq)).zip(lsbMuxArray.toSeq).foreach { case ((ins0, ins1), dut) =>
-//      ins0 := msbMux.io.ins0_seq ## dut.io.ins0_seq
-//      ins1 := msbMux.io.ins1_seq ## dut.io.ins1_seq
-//    }
-//  }
-//  import subDut._
-//
-//  val flatSeq = Vec((ins0_subSeq.zip(ins1_subSeq)).flatMap { case (t1, t2) => Seq(t1.asUInt, t2.asUInt) })
-//  val flatSeqRev = Vec(
-//    for (i <- 0 until g.BI) yield {
-//      flatSeq.read(U(i, log2Up(g.BI) bits)).asBits.reversed.asUInt
-//    }
-//  )
-//  println(flatSeq)
-//  println(flatSeqRev)
-////  val flatSeqRev = flatSeq.map(_.asBits).map(_.reversed).map(_.asUInt)
-//  io.idle := fsm.isActive(fsm.IDLE)
-//  io.RdAddrOri.payload := io.isNtt ? flatSeq | flatSeqRev
-//  io.RdAddrOri.valid := fsm.isActive(fsm.LOOP)
-//  val uDec = AddrDecode(g)
-//  uDec.io.addrOri := io.RdAddrOri.payload
-//  val probe = uDec.io.BankBus.simPublic()
-//}
-
-//case class twAddr(loopWidth:Int, stageWidth:Int,n:Int) extends App{
-//  val io = new Bundle{
-//    val loopCnt = in UInt(loopWidth bits)
-//    val stageCnt = in UInt(stageWidth bits)
-//    val musk = in Bits((stageWidth - log2Up(n)) bits)
-//    val isNtt = Bool()
-//    val twAddr = out UInt((stageWidth - log2Up(n)) bits)
-//  }
-//
-//}
 case class Ctrl(g: NttCfg2414) extends Component {
   val io = new Bundle {
     val start = in Bool ()
@@ -175,18 +72,16 @@ case class Ctrl(g: NttCfg2414) extends Component {
     ))
   }
   val loopCnt = Reg(UInt(log2Up(g.nttPoint / g.BI) bits)) init U(0)
-//  val loopCntShift = io.isNtt ? (loopCnt |>> stageCnt) | (loopCnt |>> stageCntCop)
   val stageCnt = Reg(UInt(log2Up(g.Log2NttPoints) bits)) init U(0)
+  val stageCntCop = g.Log2NttPoints - 1 - stageCnt
+
   val OH_shifter = Reg(Bits(g.Log2NttPoints bits)) init 0
   val Thermal_shifter = Reg(Bits(g.Log2NttPoints bits)) init 0
+
   val constSeq = (0 until g.paraNum).map { U(_, log2Up(g.paraNum) bits) }
-  val stageCntCop = g.Log2NttPoints - 1 - stageCnt
-  val twAddrReg = Reg(UInt(log2Up(g.nttPoint / g.paraNum) bits)) init (U(0))
-  val twMask = Reg(Bits(g.Log2NttPoints - log2Up(g.paraNum) bits)) init 0
-  val twMuskInc = io.isNtt ? (stageCntCop + 1 >= log2Up(g.paraNum)) | (stageCnt + 1 >= log2Up(g.paraNum))
+  val mask = Bits(log2Up(g.nttPoint / g.paraNum) bits)
   val fsm = new StateMachine {
     //    setEncoding(binaryOneHot)
-//    val twMuskInc = io.isNtt ? (stageCntCop + 1 >= log2Up(g.paraNum)) | (stageCnt + 1 >= log2Up(g.paraNum))
     val IDLE = makeInstantEntry()
     val LOOP = new State
     IDLE
@@ -209,11 +104,6 @@ case class Ctrl(g: NttCfg2414) extends Component {
           Thermal_shifter := io.isNtt ? (B"1'b1" ## Thermal_shifter(Thermal_shifter.high downto 1)) | (Thermal_shifter(
             Thermal_shifter.high - 1 downto 0
           ) ## B"1'b1")
-          when(twMuskInc) {
-            twMask := io.isNtt ? (B"1'b1" ## twMask(twMask.high downto 1)) | (twMask(
-              twMask.high - 1 downto 0
-            ) ## B"1'b1")
-          }
         }
         when(loopCnt === loopCnt.maxValue) {
           loopCnt := U(0)
@@ -223,9 +113,8 @@ case class Ctrl(g: NttCfg2414) extends Component {
         }
       }
     when(isNext(IDLE)) {
-      loopCnt := 0; stageCnt := 0; twAddrReg := U(0)
+      loopCnt := 0; stageCnt := 0;
       OH_shifter := 0; Thermal_shifter := 0
-      twMask := 0
     }
   }
 
@@ -256,22 +145,18 @@ case class Ctrl(g: NttCfg2414) extends Component {
     }
   }
   import subDut._
-  val twMux = new Area {
+  val twGen = new Area {
     val twLoopCntMsbPad = Cat(B"1'b1", loopCnt).asUInt
-    val loopCntShiftNtt = UInt(loopCnt.getWidth bits)
-    val loopCntShiftIntt = UInt(loopCnt.getWidth bits)
-    loopCntShiftNtt := loopCnt |>> stageCnt
-    loopCntShiftIntt := (Cat((B"1'b1" #* log2Up(g.BI)), loopCnt).asUInt |>> stageCntCop).resized
-//    val twLoopShift = io.isNtt ? ()|()
-//    val loopMuxSel = twLoopCntMsbPad |>> ()
-    val twAddr = Cat(
-      twMask.msb,
-      io.isNtt ? (twMask(twMask.high - 1 downto 0) | loopCntShiftNtt.asBits) | (twMask(
-        twMask.high - 1 downto 0
-      ) & loopCntShiftIntt.asBits)
-    ).asUInt
+    val loopCntShiftNtt = UInt(loopCnt.getWidth + 1 bits)
+    val loopCntShiftIntt = UInt(loopCnt.getWidth + 1 bits)
+    loopCntShiftIntt := (Cat((B"1'b0" #* log2Up(g.BI)), loopCnt).asUInt |>> stageCnt).resized
+    loopCntShiftNtt := (Cat((B"1'b1" #* log2Up(g.BI)), loopCnt).asUInt |>> stageCntCop).resized
+    mask := io.isNtt ? Thermal_shifter(0, log2Up(g.nttPoint / g.paraNum) bits).reversed | Thermal_shifter(
+      Thermal_shifter.high - 1 downto (Thermal_shifter.high - log2Up(g.nttPoint / g.paraNum))
+    ).reversed
+    val twAddr = io.isNtt ? (mask & loopCntShiftNtt.asBits) | (mask | loopCntShiftIntt.asBits)
   }
-  import twMux._
+  import twGen._
 
   val flatSeq = Vec((ins0_subSeq.zip(ins1_subSeq)).flatMap { case (t1, t2) => Seq(t1.asUInt, t2.asUInt) })
   io.idle := fsm.isActive(fsm.IDLE)
@@ -283,7 +168,7 @@ case class Ctrl(g: NttCfg2414) extends Component {
     val probe = uDec.io.BankBus.simPublic()
   }
 
-  io.TwBus.payload.twAddr := twAddr
+  io.TwBus.payload.twAddr := twAddr.asUInt
   io.TwBus.payload.twMux.assignDontCare()
   io.TwBus.valid := fsm.isActive(fsm.LOOP)
 }
@@ -319,7 +204,7 @@ object TwMuxGenV extends App {
 
 object CtrlSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new Ctrl(NttCfg2414(nttPoint = 64)))
+  val dut = SimConfig.withXSim.withWave.compile(new Ctrl(NttCfg2414(nttPoint = 128)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(1000 * period)
