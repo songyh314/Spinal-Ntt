@@ -42,6 +42,11 @@ object NttCfg {
     val Tw = UInt(g.width bits)
   }
 
+  case class twPayload(addrWidth: Int, muxWidth: Int, para: Int) extends Bundle {
+    val twAddr = UInt(addrWidth bits)
+    val twMux = Vec(UInt(muxWidth bits), para)
+  }
+
   case class ParaWriteBus(DataWidth: Int, AddrWidth: Int, para: Int) extends Bundle with IMasterSlave {
     val Addr = Vec(UInt(AddrWidth bits), para)
     val Data = Vec(UInt(DataWidth bits), para)

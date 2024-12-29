@@ -31,6 +31,37 @@ case class SeqMux(width: Int) extends Component {
   }
   io.ins0_seq := (cmpSeq.asBits)
   io.ins1_seq := (cmpSeq.asBits | io.ohSeq)
+}
+
+case class twMux(num: Int) extends Component {
+  assert(isPow2(num) && (num != 1), "tw num should be power of 2 and should not be 1")
+  val width = log2Up(num)
+  val io = new Bundle {
+    val constSeq = in Bits (width bits)
+    val loopSeq = in Bits (width bits)
+    val stageCntLsb = in Bits (log2Up(width) bits)
+    val stageCntoverflw = in Bool ()
+    val twMuxUnit = out UInt (width bits)
+  }
+  val muxTmp = Vec(Bits(width + 1 bits), width)
+  val jointSeq = Cat(io.loopSeq, io.constSeq)
+  for (i <- 0 until width) {
+    muxTmp(i) := jointSeq(i, width + 1 bits)
+  }
+  val muxRes = Vec(Bool(), width)
+  muxRes.zip(muxTmp).foreach { case (t1, t2) =>
+    when(io.stageCntoverflw) {
+      t1 := t2.msb
+    } otherwise {
+      t1 := (t2(t2.high - 1 downto 0).asBools).read(io.stageCntLsb.asUInt.resized)
+    }
+  }
+  io.twMuxUnit := muxRes.asBits.asUInt
+}
+
+object twMuxSim extends App {
+  val period = 10
+  val dut = SimConfig.withXSim.withWave.compile(new twMux(4))
 
 }
 
@@ -121,12 +152,27 @@ case class SeqMux(width: Int) extends Component {
 //  val probe = uDec.io.BankBus.simPublic()
 //}
 
+//case class twAddr(loopWidth:Int, stageWidth:Int,n:Int) extends App{
+//  val io = new Bundle{
+//    val loopCnt = in UInt(loopWidth bits)
+//    val stageCnt = in UInt(stageWidth bits)
+//    val musk = in Bits((stageWidth - log2Up(n)) bits)
+//    val isNtt = Bool()
+//    val twAddr = out UInt((stageWidth - log2Up(n)) bits)
+//  }
+//
+//}
 case class Ctrl(g: NttCfg2414) extends Component {
   val io = new Bundle {
     val start = in Bool ()
     val isNtt = in Bool ()
     val idle = out Bool ()
     val RdAddrOri = master Flow Vec(UInt(g.Log2NttPoints bits), g.BI)
+    val TwBus = master Flow (twPayload(
+      addrWidth = log2Up(g.nttPoint / g.paraNum),
+      muxWidth = log2Up(g.paraNum),
+      para = g.paraNum
+    ))
   }
   val loopCnt = Reg(UInt(log2Up(g.nttPoint / g.BI) bits)) init U(0)
 //  val loopCntShift = io.isNtt ? (loopCnt |>> stageCnt) | (loopCnt |>> stageCntCop)
@@ -137,9 +183,10 @@ case class Ctrl(g: NttCfg2414) extends Component {
   val stageCntCop = g.Log2NttPoints - 1 - stageCnt
   val twAddrReg = Reg(UInt(log2Up(g.nttPoint / g.paraNum) bits)) init (U(0))
   val twMask = Reg(Bits(g.Log2NttPoints - log2Up(g.paraNum) bits)) init 0
+  val twMuskInc = io.isNtt ? (stageCntCop + 1 >= log2Up(g.paraNum)) | (stageCnt + 1 >= log2Up(g.paraNum))
   val fsm = new StateMachine {
     //    setEncoding(binaryOneHot)
-    val twMuskInc = io.isNtt ? (stageCntCop + 1 >= log2Up(g.paraNum)) | (stageCnt + 1 >= log2Up(g.paraNum))
+//    val twMuskInc = io.isNtt ? (stageCntCop + 1 >= log2Up(g.paraNum)) | (stageCnt + 1 >= log2Up(g.paraNum))
     val IDLE = makeInstantEntry()
     val LOOP = new State
     IDLE
@@ -208,12 +255,25 @@ case class Ctrl(g: NttCfg2414) extends Component {
       ins1 := msbMux.io.ins1_seq ## dut.io.ins1_seq
     }
   }
-
   import subDut._
+  val twMux = new Area {
+    val twLoopCntMsbPad = Cat(B"1'b1", loopCnt).asUInt
+    val loopCntShiftNtt = UInt(loopCnt.getWidth bits)
+    val loopCntShiftIntt = UInt(loopCnt.getWidth bits)
+    loopCntShiftNtt := loopCnt |>> stageCnt
+    loopCntShiftIntt := (Cat((B"1'b1" #* log2Up(g.BI)), loopCnt).asUInt |>> stageCntCop).resized
+//    val twLoopShift = io.isNtt ? ()|()
+//    val loopMuxSel = twLoopCntMsbPad |>> ()
+    val twAddr = Cat(
+      twMask.msb,
+      io.isNtt ? (twMask(twMask.high - 1 downto 0) | loopCntShiftNtt.asBits) | (twMask(
+        twMask.high - 1 downto 0
+      ) & loopCntShiftIntt.asBits)
+    ).asUInt
+  }
+  import twMux._
 
   val flatSeq = Vec((ins0_subSeq.zip(ins1_subSeq)).flatMap { case (t1, t2) => Seq(t1.asUInt, t2.asUInt) })
-
-  //  val flatSeqRev = flatSeq.map(_.asBits).map(_.reversed).map(_.asUInt)
   io.idle := fsm.isActive(fsm.IDLE)
   io.RdAddrOri.payload := flatSeq
   io.RdAddrOri.valid := fsm.isActive(fsm.LOOP)
@@ -222,19 +282,10 @@ case class Ctrl(g: NttCfg2414) extends Component {
     uDec.io.addrOri := io.RdAddrOri.payload
     val probe = uDec.io.BankBus.simPublic()
   }
-  val loopCntShiftNtt = UInt(loopCnt.getWidth bits)
-  loopCntShiftNtt := loopCnt |>> stageCnt
-//  loopCntShiftNtt := (Cat(B"${log2Up(g.BI)}'b0",loopCnt).asUInt |>> stageCnt).resized
-  val loopCntShiftIntt = UInt(loopCnt.getWidth bits)
-  loopCntShiftIntt := loopCnt |>> stageCntCop
-//  loopCntShiftIntt := (Cat(B"${log2Up(g.BI)}'b0",loopCnt).asUInt |>> stageCntCop).resized
-  val twAddr = Cat(
-    twMask.msb,
-    io.isNtt ? (twMask(twMask.high - 1 downto 0) | loopCntShiftNtt.asBits) | (twMask(
-      twMask.high - 1 downto 0
-    ) & loopCntShiftIntt.asBits)
-  ).asUInt
 
+  io.TwBus.payload.twAddr := twAddr
+  io.TwBus.payload.twMux.assignDontCare()
+  io.TwBus.valid := fsm.isActive(fsm.LOOP)
 }
 
 object CtrlGenV extends App {
@@ -254,6 +305,16 @@ object SeqMuxGenV extends App {
     targetDirectory = "./rtl/Ntt/CtrlPath/",
     genLineComments = true
   ).generate(new SeqMux(8))
+}
+
+object TwMuxGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "./rtl/Ntt/CtrlPath/",
+    genLineComments = true
+  ).generate(new twMux(4))
 }
 
 object CtrlSim extends App {
