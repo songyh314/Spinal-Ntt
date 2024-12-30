@@ -24,8 +24,12 @@ class AddSub(g: NttCfg2414) extends Component {
 
   import io._
 
-  val Add_tmp = ((dataIn.A +^ dataIn.B) >= g.Prime) ? (dataIn.A +^ dataIn.B - g.Prime) | (dataIn.A + dataIn.B)
-  val Sub_tmp = (dataIn.A >= dataIn.B) ? (dataIn.A - dataIn.B) | (dataIn.A +^ g.Prime - dataIn.B)
+  val Add_tmp1 = dataIn.A +^ dataIn.B - g.Prime
+  val Add_tmp2 = (dataIn.A + dataIn.B)
+  val Add_tmp = ((dataIn.A +^ dataIn.B) >= g.Prime) ? Add_tmp1 | Add_tmp2
+  val Sub_tmp1 = dataIn.A - dataIn.B
+  val Sub_tmp2 = dataIn.A +^ g.Prime - dataIn.B
+  val Sub_tmp = (dataIn.A >= dataIn.B) ? Sub_tmp1 | Sub_tmp2
   val addReg = Reg(UInt(g.width bits))
   val subReg = Reg(UInt(g.width bits))
   val probe = Vec(UInt(24 bits),2)

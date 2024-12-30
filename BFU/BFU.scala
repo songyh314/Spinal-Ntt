@@ -20,7 +20,7 @@ class Bfu(g: NttCfg2414) extends Component {
   import io._
   val uAddSub = new AddSub(g)
   val uModMult = new ModMult(g)
-  val DelayOutSt1 = Delay(io.dataIn.Tw, g.BfuLatencySt1)
+  val DelayOutSt1 = Delay(io.dataIn.Tw, g.BfuLatencySt1).addAttribute("srl_style","srl")
   val DelayOutSt2 = Delay(io.isNtt ? io.dataIn.A | uAddSub.io.dataOut.A, g.BfuLatencySt2)
 
   uModMult.io.dataIn.valid := isNtt ? io.dataIn.valid | uAddSub.io.dataOut.valid

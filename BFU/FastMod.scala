@@ -79,9 +79,13 @@ class FastMod2414(g: NttCfg2414) extends Component {
   val E = Dslice.reduce(_ + _)
   val Fsub = Dslice(1) + Aslice(1)
   val F = (E << g.N) - Fsub
-  val Res1_value = (F +^ C >= g.Prime) ? (F +^ C._data - g.Prime) | (F +^ C._data)
+  val Res1_tmp1 = F +^ C._data - g.Prime
+  val Res1_tmp2 = F +^ C._data
+  val Res1_value = (F +^ C >= g.Prime) ? Res1_tmp1 | Res1_tmp2
   val Res1 = RegNext(Res1_value)
-  val Res2_value = (Res1 >= B) ? (Res1 - B) | ((Res1 +^ g.Prime) - B)
+  val Res2_tmp1 = Res1 - B
+  val Res2_tmp2 = (Res1 +^ g.Prime) - B
+  val Res2_value = (Res1 >= B) ? Res2_tmp1 | Res2_tmp2
   val Res2 = RegNext(Res2_value)
   val valid = Delay(io.dataIn.valid, LatencyAnalysis(io.dataIn.payload, Res2))
   io.dataOut.payload := Res2.resized
@@ -192,7 +196,7 @@ object test extends App {
   }
 }
 
-object axiRamVivadoFlow extends App {
+object FastModVivadoFlow extends App {
 
   val workspace = "./vivado_prj/Ntt/FastMod"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"

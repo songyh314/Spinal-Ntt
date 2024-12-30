@@ -150,7 +150,32 @@ object WriteBackArbit{
     dut
   }
 }
+object WriteBackArbitGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "./rtl/Ntt/DataPath"
+  ).generate(new WriteBackArbit(NttCfg2414()))
+}
+object WriteBackArbitVivadoFlow extends App {
 
+  val workspace = "./vivado_prj/Ntt/DataPath/AddrDecode"
+  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
+  val family = "Zynq UltraScale+ MPSoCS"
+  val device = "xczu9eg-ffvb1156-2-i"
+  val frequency = 300 MHz
+  val cpu = 16
+  val rtl = new Rtl {
+
+    /** Name */
+    override def getName(): String = "WriteBackArbit"
+    override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/DataPath/WriteBackArbit.v"
+  }
+
+  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
+  println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
+}
 
 
 

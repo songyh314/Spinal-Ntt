@@ -178,25 +178,33 @@ case class Ctrl(g: NttCfg2414) extends Component {
   }
   import subDut._
   val twGen = new Area {
-    val twLoopCntMsbPad = Cat(B"1'b1", loopCnt).asUInt
+    val twLoopCntMsbPad = Cat((B"1'b1"), loopCnt).asUInt
     val loopCntShiftNtt = UInt(loopCnt.getWidth + 1 bits)
     val loopCntShiftIntt = UInt(loopCnt.getWidth + 1 bits)
     loopCntShiftIntt := (Cat((B"1'b0" #* log2Up(g.BI)), loopCnt).asUInt |>> stageCnt).resized
     loopCntShiftNtt := (Cat((B"1'b1" #* log2Up(g.BI)), loopCnt).asUInt |>> stageCntCop).resized
-    mask := io.isNtt ? Thermal_shifter(0, log2Up(g.nttPoint / g.paraNum) bits).reversed | Thermal_shifter(
-      Thermal_shifter.high - 1 downto (Thermal_shifter.high - log2Up(g.nttPoint / g.paraNum))
-    ).reversed
+//    mask := io.isNtt ? Thermal_shifter(0, log2Up(g.nttPoint / g.paraNum) bits).reversed | Thermal_shifter(
+//      Thermal_shifter.high - (log2Up(log2Up(g.paraNum))) downto (Thermal_shifter.high - (log2Up(
+//        log2Up(g.paraNum)
+//      )) - log2Up(g.nttPoint / g.paraNum) + 1)
+//    ).reversed
+    mask := io.isNtt ? Thermal_shifter(0, log2Up(g.nttPoint / g.paraNum) bits).reversed | Thermal_shifter(1,log2Up(g.nttPoint / g.paraNum) bits).reversed
     val twAddr = io.isNtt ? (mask & loopCntShiftNtt.asBits) | (mask | loopCntShiftIntt.asBits)
-    val stageOverflow = io.isNtt ? (stageCntCop >= 2) | (stageCnt >= 2)
-    val shiftCnt = io.isNtt ? { stageOverflow ? (stageCntCop - 2) | U(0) } | { stageOverflow ? (stageCnt - 2) | U(0) }
+    val stageOverflow = io.isNtt ? (stageCntCop >= log2Up(g.paraNum)) | (stageCnt >= log2Up(g.paraNum))
+    val shiftCnt = io.isNtt ? { stageOverflow ? (stageCntCop - log2Up(g.paraNum)) | U(0) } | {
+      stageOverflow ? (stageCnt - log2Up(g.paraNum)) | U(0)
+    }
     val loopSeq = Bits(log2Up(g.paraNum) bits)
-    loopSeq := (twLoopCntMsbPad >> shiftCnt)(0, log2Up(g.paraNum) bits).asBits
+    loopSeq := (twLoopCntMsbPad >> shiftCnt).resize(log2Up(g.paraNum) bits)(0, log2Up(g.paraNum) bits).asBits
     val twMuxArray = Array.fill(g.paraNum)(new twMux(g.paraNum))
     twMuxArray.toSeq.zip(constSeq).foreach {
       case (t1, t2) => {
         t1.io.loopSeq := loopSeq
         t1.io.constSeq := t2.asBits
-        t1.io.stageCntLsb := io.isNtt ? stageCntCop(0,log2Up(log2Up(g.paraNum)) bits).asBits | stageCnt(0,log2Up(log2Up(g.paraNum)) bits).asBits
+        t1.io.stageCntLsb := io.isNtt ? stageCntCop(0, log2Up(log2Up(g.paraNum)) bits).asBits | stageCnt(
+          0,
+          log2Up(log2Up(g.paraNum)) bits
+        ).asBits
         t1.io.stageCntoverflow := stageOverflow
       }
     }
@@ -225,7 +233,7 @@ object CtrlGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/CtrlPath/",
     genLineComments = true
-  ).generate(new Ctrl(NttCfg2414(debug = false)))
+  ).generate(new Ctrl(NttCfg2414(paraNum = 32,debug = false)))
 }
 object SeqMuxGenV extends App {
   SpinalConfig(
@@ -249,7 +257,7 @@ object TwMuxGenV extends App {
 
 object CtrlSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new Ctrl(NttCfg2414()))
+  val dut = SimConfig.withXSim.withWave.compile(new Ctrl(NttCfg2414(nttPoint = 128, paraNum = 16)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)
