@@ -40,7 +40,7 @@ case class twMux(num: Int) extends Component {
     val constSeq = in Bits (width bits)
     val loopSeq = in Bits (width bits)
     val stageCntLsb = in Bits (log2Up(width) bits)
-    val stageCntoverflw = in Bool ()
+    val stageCntoverflow = in Bool ()
     val twMuxUnit = out UInt (width bits)
   }
   val muxTmp = Vec(Bits(width + 1 bits), width)
@@ -50,13 +50,45 @@ case class twMux(num: Int) extends Component {
   }
   val muxRes = Vec(Bool(), width)
   muxRes.zip(muxTmp).foreach { case (t1, t2) =>
-    when(io.stageCntoverflw) {
+    when(io.stageCntoverflow) {
       t1 := t2.msb
     } otherwise {
       t1 := (t2(t2.high - 1 downto 0).asBools).read(io.stageCntLsb.asUInt.resized)
     }
   }
   io.twMuxUnit := muxRes.asBits.asUInt
+}
+object twMuxSim extends App {
+  val period = 10
+  val n = 4
+  val dut = SimConfig.withWave.withXSim.compile(new twMux(n))
+  dut.doSim("test") { dut =>
+    import dut._
+    SimTimeout(1000 * period)
+    clockDomain.forkStimulus(period)
+    clockDomain.waitSampling(10)
+    io.constSeq #= BigInt("01", 2)
+    var flag = true
+    val loopSeq = fork {
+      while (flag) {
+        for (i <- 0 until n) {
+          io.loopSeq #= i
+          clockDomain.waitSampling()
+        }
+      }
+    }
+    val ctrl = fork(
+      while (flag) {
+        io.stageCntoverflow.randomize()
+        io.stageCntLsb.randomize()
+        clockDomain.waitSampling()
+      }
+    )
+    clockDomain.waitSampling(100)
+    flag = false
+    loopSeq.join()
+    ctrl.join()
+  }
 }
 
 case class Ctrl(g: NttCfg2414) extends Component {
@@ -155,6 +187,19 @@ case class Ctrl(g: NttCfg2414) extends Component {
       Thermal_shifter.high - 1 downto (Thermal_shifter.high - log2Up(g.nttPoint / g.paraNum))
     ).reversed
     val twAddr = io.isNtt ? (mask & loopCntShiftNtt.asBits) | (mask | loopCntShiftIntt.asBits)
+    val stageOverflow = io.isNtt ? (stageCntCop >= 2) | (stageCnt >= 2)
+    val shiftCnt = io.isNtt ? { stageOverflow ? (stageCntCop - 2) | U(0) } | { stageOverflow ? (stageCnt - 2) | U(0) }
+    val loopSeq = Bits(log2Up(g.paraNum) bits)
+    loopSeq := (twLoopCntMsbPad >> shiftCnt)(0, log2Up(g.paraNum) bits).asBits
+    val twMuxArray = Array.fill(g.paraNum)(new twMux(g.paraNum))
+    twMuxArray.toSeq.zip(constSeq).foreach {
+      case (t1, t2) => {
+        t1.io.loopSeq := loopSeq
+        t1.io.constSeq := t2.asBits
+        t1.io.stageCntLsb := io.isNtt ? stageCntCop(0,log2Up(log2Up(g.paraNum)) bits).asBits | stageCnt(0,log2Up(log2Up(g.paraNum)) bits).asBits
+        t1.io.stageCntoverflow := stageOverflow
+      }
+    }
   }
   import twGen._
 
@@ -169,7 +214,7 @@ case class Ctrl(g: NttCfg2414) extends Component {
   }
 
   io.TwBus.payload.twAddr := twAddr.asUInt
-  io.TwBus.payload.twMux.assignDontCare()
+  io.TwBus.payload.twMux.zip(twMuxArray.toSeq).foreach { case (t1, t2) => t1 := t2.io.twMuxUnit }
   io.TwBus.valid := fsm.isActive(fsm.LOOP)
 }
 
@@ -204,10 +249,10 @@ object TwMuxGenV extends App {
 
 object CtrlSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new Ctrl(NttCfg2414(nttPoint = 128)))
+  val dut = SimConfig.withXSim.withWave.compile(new Ctrl(NttCfg2414()))
   dut.doSim("test") { dut =>
     import dut._
-    SimTimeout(1000 * period)
+    SimTimeout(5000 * period)
     clockDomain.forkStimulus(period)
     clockDomain.waitSampling(10)
     io.start #= true
