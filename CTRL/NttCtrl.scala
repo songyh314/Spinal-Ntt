@@ -98,7 +98,7 @@ case class Ctrl(g: NttCfg2414) extends Component {
     val idle = out Bool ()
     val RdAddrOri = master Flow Vec(UInt(g.Log2NttPoints bits), g.BI)
     val TwBus = master Flow (twPayload(
-      addrWidth = log2Up(g.nttPoint / g.paraNum),
+      addrWidth = g.twAddrWidth,
       muxWidth = log2Up(g.paraNum),
       para = g.paraNum
     ))

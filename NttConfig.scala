@@ -25,6 +25,10 @@ object NttCfg {
     val Log2NttPoints = log2Up(nttPoint)
     val BankIndexWidth = log2Up(BI)
     val BankAddrWidth = Log2NttPoints - BankIndexWidth
+    val twNum = nttPoint/paraNum
+    val twAddrWidth = log2Up(nttPoint/paraNum)
+    val twWidth = width*paraNum
+//    val twInitSeq = (0 until nttPoint).map(B(_,width bits)).grouped(paraNum).map(item => Cat(item)).toSeq
     val BfuNttDelay = AddSubLatencyNtt + MultLatency + FastModLatency
     val BfuInttDelay = AddSubLatencyIntt + MultLatency + FastModLatency
     def show(): Unit = {
@@ -49,7 +53,7 @@ object NttCfg {
 
   case class ParaWriteBus(DataWidth: Int, AddrWidth: Int, para: Int) extends Bundle with IMasterSlave {
     val Addr = Vec(UInt(AddrWidth bits), para)
-    val Data = Vec(UInt(DataWidth bits), para)
+    val Data = Vec(Bits(DataWidth bits), para)
 
     override def asMaster(): Unit = {
       out(Addr, Data)

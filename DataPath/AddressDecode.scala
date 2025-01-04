@@ -6,6 +6,7 @@ import spinal.core.sim._
 import spinal.lib._
 import Ntt.NttCfg._
 import myRam._
+import myTools._
 import spinal.lib.eda.bench.Rtl
 import spinal.lib.eda.xilinx.VivadoFlow
 
@@ -99,7 +100,34 @@ object idxMux {
     uidxMux
   }
 }
-
+case class idxShuffle(idxWidth: Int, n: Int) extends Component {
+  val io = new Bundle {
+    val bankIdx = in Vec (UInt(idxWidth bits), n)
+    val shuffleIdx = out Vec (UInt(idxWidth bits), n)
+  }
+  noIoPrefix()
+  val base = Vec(UInt(idxWidth * n bits), n)
+  base := Vec((0 until n).map(U(_).resized))
+  val ret = Vec(
+    base
+      .zip(io.bankIdx)
+      .map { p => p._1 |<< (p._2 * idxWidth) }
+      .map(_.asBits)
+      .reduceBalancedTree(_ | _)
+      .subdivideIn(n slices)
+      .map(_.asUInt)
+  )
+  io.shuffleIdx := ret
+}
+object idxShuffle {
+  def apply(dataIn: Vec[UInt]): Vec[UInt] = {
+    val width = dataIn.head.getWidth
+    val n = dataIn.size
+    val dut = new idxShuffle(width, n)
+    dut.io.bankIdx := dataIn
+    dut.io.shuffleIdx
+  }
+}
 case class AddrMux(g: NttCfg2414) extends Component {
   val io = new Bundle {
     val BankBus = in Vec (DecodeBus(idx = g.BankIndexWidth, addr = g.BankAddrWidth), g.BI)
@@ -118,17 +146,102 @@ case class AddrMux(g: NttCfg2414) extends Component {
   io.IdxTrans := clusterIdx
 }
 
-case class DataDeMux(g: NttCfg2414) extends Component {
+case class reOrder(idxWidth: Int, dataWidth: Int, addrWidth: Int, n: Int, useData: Boolean) extends Component {
   val io = new Bundle {
-    val DataBus = in Vec (UInt(g.width bits), g.BI)
-    val IdxTrans = in Vec (UInt(g.BankIndexWidth bits), g.BI)
-    val DataDeMux = out Vec (UInt(g.width bits), g.BI)
+    val BankBus = in Vec (DecodeBus(idx = idxWidth, addr = addrWidth), n)
+    val dataIn = in Vec (Bits(dataWidth bits), n)
+    val idxTrans = if (!useData) (out Vec (UInt(idxWidth bits), n)) else (null)
+    val AddrBus = out Vec (UInt(addrWidth bits), n)
+    val dataBus = if (useData) { out Vec (Bits(dataWidth bits), n) }
+    else null
   }
   noIoPrefix()
-  def DeMux(idx: UInt): UInt = {
+  val clusterAddr = Vec(for (i <- 0 until n) yield { io.BankBus(i).BankAddr })
+  val clusterIdx = Vec(for (j <- 0 until n) yield { io.BankBus(j).BankIdx })
+  val shuffleIdx = idxShuffle(clusterIdx)
+
+  def addrMux(idx: UInt): UInt = {
+    clusterAddr.read(idx)
+  }
+  def dataMux(idx: UInt): Bits = {
+    io.dataIn.read(idx)
+  }
+  io.AddrBus.zip(shuffleIdx).map { case (t1, t2) => t1 := addrMux(t2) }
+  if (useData) {
+    io.dataBus.zip(shuffleIdx).map { case (t1, t2) => t1 := dataMux(t2) }
+  } else {
+    io.idxTrans := clusterIdx
+  }
+}
+
+case class memPreCal(g: NttCfg2414, useData: Boolean) extends Component {
+  val io = new Bundle {
+    val oriAddr = in Vec (UInt(log2Up(g.nttPoint) bits), g.BI)
+    val dataIn = if (useData) { in Vec (Bits(g.width bits), g.BI) }
+    else { null }
+    val AddrBus = out Vec (UInt(g.BankAddrWidth bits), g.BI)
+    val idxTrans = if (!useData) (out Vec (UInt(g.BankIndexWidth bits), g.BI)) else { null }
+    val dataBus = if (useData) { out Vec (Bits(g.width bits), g.BI) }
+    else null
+  }
+  val uAddrDecode = new AddrDecode(g)
+  val uAddrMux = new AddrMux(g)
+  uAddrDecode.io.addrOri := io.oriAddr
+  val addr_dec = uAddrDecode.io.BankBus
+  private val reOrderInst = new reOrder(
+    idxWidth = g.BankIndexWidth,
+    dataWidth = g.width,
+    addrWidth = g.BankAddrWidth,
+    n = g.BI,
+    useData = useData
+  )
+  reOrderInst.io.BankBus := addr_dec
+  io.AddrBus := reOrderInst.io.AddrBus
+  if (useData) {
+    reOrderInst.io.dataIn := io.dataIn
+    io.dataBus := reOrderInst.io.dataBus
+  } else {
+    io.idxTrans := reOrderInst.io.idxTrans
+  }
+}
+object memPreCalGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "./rtl/Ntt/DataPath"
+  ).generate(new memPreCal(NttCfg2414(), true))
+}
+object reOrderGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "./rtl/Ntt/DataPath"
+  ).generate(new reOrder(3, 24, 7, 8, false))
+}
+case class DataDeMux(dataWidth:Int,idxWidth:Int,n:Int) extends Component {
+  val io = new Bundle {
+    val DataBus = in Vec (Bits(dataWidth bits), n)
+    val IdxTrans = in Vec (UInt(idxWidth bits), n)
+    val DataDeMux = out Vec (Bits(dataWidth bits), n)
+  }
+  noIoPrefix()
+  def DeMux(idx: UInt): Bits = {
     io.DataBus.read(idx)
   }
   io.DataDeMux.zip(io.IdxTrans).foreach { case (t1, t2) => t1 := (DeMux(t2)) }
+}
+object DataDeMux {
+  def apply(dataIn:Vec[Bits],idx:Vec[UInt]) = {
+    val dataW = dataIn.head.getWidth
+    val idxW = idx.head.getWidth
+    val n = dataIn.size
+    val dut = new DataDeMux(dataW,idxW,n)
+    dut.io.DataBus := dataIn
+    dut.io.IdxTrans := idx
+    dut.io.DataDeMux
+  }
 }
 case class WriteBackArbit(g: NttCfg2414) extends Component {
   val io = new Bundle {
@@ -142,11 +255,11 @@ case class WriteBackArbit(g: NttCfg2414) extends Component {
   }
   io.dataOut.zip(io.idxIn).foreach { case (t1, t2) => t1 := DeMux(t2) }
 }
-object WriteBackArbit{
-  def apply(g:NttCfg2414, dataIn: Array[Flow[DataPayload]], idx:Vec[UInt]):WriteBackArbit = {
+object WriteBackArbit {
+  def apply(g: NttCfg2414, dataIn: Array[Flow[DataPayload]], idx: Vec[UInt]): WriteBackArbit = {
     val WriteBackPayload = Vec(dataIn.flatMap { item => Seq(item.payload.A, item.payload.B) }.toSeq)
     val dut = new WriteBackArbit(g)
-    dut.io.dataIn := WriteBackPayload;dut.io.idxIn := idx
+    dut.io.dataIn := WriteBackPayload; dut.io.idxIn := idx
     dut
   }
 }
@@ -173,12 +286,9 @@ object WriteBackArbitVivadoFlow extends App {
     override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/DataPath/WriteBackArbit.v"
   }
 
-  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
+  val flow = myVivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
   println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
 }
-
-
-
 
 case class rdAddrMux2(g: NttCfg2414) extends Component {
   val io = new Bundle {
@@ -197,14 +307,14 @@ case class rdAddrMux2(g: NttCfg2414) extends Component {
   io.RdAddrBus.zip(decIdx).map { case (t1, t2) => t1 := RegNext(AddrMux(t2)) }
   io.IdxTrans := RegNext(clusterIdx)
 }
-object AddrMuxGenV extends App {
-  SpinalConfig(
-    mode = Verilog,
-    nameWhenByFile = false,
-    anonymSignalPrefix = "tmp",
-    targetDirectory = "./rtl/Ntt/DataPath"
-  ).generate(new DataDeMux(NttCfg2414()))
-}
+//object AddrMuxGenV extends App {
+//  SpinalConfig(
+//    mode = Verilog,
+//    nameWhenByFile = false,
+//    anonymSignalPrefix = "tmp",
+//    targetDirectory = "./rtl/Ntt/DataPath"
+//  ).generate(new DataDeMux(NttCfg2414()))
+//}
 
 object DecodeUnitSim extends App {
   val period = 10
