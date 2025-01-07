@@ -8,7 +8,7 @@ object NttCfg {
     val M = 24
     val N = 14
     val useBramIP = false
-    val ramLatency = 2
+    val ramLatency = 1
     val AddSubLatencyIntt = 2
     val AddSubLatencyNtt = 1
     val MultLatency = 4

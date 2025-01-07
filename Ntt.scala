@@ -29,9 +29,9 @@ case class addrDecodeTest(g: NttCfg2414) extends Component {
 object addrDecodeTestSim extends App {
   val period = 10
   val dut = SimConfig.withXSim.withWave.compile(new addrDecodeTest(NttCfg2414(nttPoint = 128)))
-  dut.doSim("test"){ dut =>
+  dut.doSim("test") { dut =>
     import dut._
-    SimTimeout(1000*period)
+    SimTimeout(1000 * period)
     clockDomain.forkStimulus(period)
     io.start #= false
     io.isNtt #= true
@@ -100,6 +100,57 @@ case class ctrlMem(g: NttCfg2414) extends Component {
 
 }
 
+case class ctrlMemOpt1(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val start = in Bool ()
+    val isNtt = in Bool ()
+    val idle = out Bool ()
+    val isCal = in Bool ()
+    val isOutSideRead = in Bool ()
+    val isOutSideWrite = in Bool ()
+
+    val outsideAddrOri = slave Flow Vec(UInt(g.Log2NttPoints bits), g.BI)
+    val outsideRdDataArray = master Flow Vec(Bits(g.width bits), g.BI)
+    val outsideWrDataArray = slave Flow Vec(Bits(g.width bits), g.BI)
+
+    val NttPayload = Array.fill(g.paraNum)(master Flow BfuPayload(g))
+    //    val wrAddrOri = slave Flow Vec(UInt(g.Log2NttPoints bits), g.BI)
+
+    val NttWriteBack = Array.fill(g.paraNum)(slave Flow DataPayload(g))
+  }
+
+  val ctrl = new Ctrl(g)
+
+  ctrl.io.start := io.start
+  ctrl.io.isNtt := io.isNtt
+
+  val mem = new MemTopOpt1(g)
+  // ctrl bus--------------------------------------------------
+  mem.io.isOutSideRead := io.isOutSideRead
+  mem.io.isOutSideWrite := io.isOutSideWrite
+  mem.io.isCal := io.isCal
+  mem.io.isNtt := io.isNtt
+  io.idle := ctrl.io.idle
+  // -----------------------------------------------------------
+
+  // outside read&write -----------------------------------------
+  mem.io.outsideAddrOri := io.outsideAddrOri
+  io.outsideRdDataArray := mem.io.outsideRdDataArray
+  mem.io.outsideWrDataArray := io.outsideWrDataArray
+  // -----------------------------------------------------------
+
+  // mem -> bfu------------------------------------------------
+  mem.io.bfuRdAddrOri := ctrl.io.RdAddrOri
+  mem.io.twBus := ctrl.io.TwBus
+  io.NttPayload.toSeq.zip(mem.io.NttPayload.toSeq).foreach { case (t1, t2) => t1 := t2 }
+  // -----------------------------------------------------------
+
+  // bfu -> mem-------------------------------------------------
+  mem.io.NttWriteBack.toSeq.zip(io.NttWriteBack.toSeq).foreach { case (t1, t2) => t1 := t2 }
+  // -----------------------------------------------------------
+
+}
+
 object ctrlMemGenV extends App {
   SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "./rtl/Ntt/Top/")
     .generate(new ctrlMem(NttCfg2414()))
@@ -127,6 +178,57 @@ object ctrlMemSim extends App {
     }
     clockDomain.waitSampling(10)
     io.isNtt #= true
+    clockDomain.waitSampling()
+    io.start #= true
+    clockDomain.waitSampling()
+    io.start #= false
+    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
+    clockDomain.waitSampling(10)
+  }
+}
+
+object ctrlMemOpt1Sim extends App {
+  val period = 10
+  val dut = SimConfig.withXSim.withWave.compile(new ctrlMemOpt1(NttCfg2414(nttPoint = 128)))
+  dut.doSim("test") { dut =>
+    import dut._
+    SimTimeout(1000 * period)
+    clockDomain.forkStimulus(period)
+    io.isNtt #= false
+    io.start #= false
+    io.isCal #= false
+    io.isOutSideRead #= false
+    io.isOutSideWrite #= false
+    clockDomain.waitSampling(10)
+
+    io.isOutSideWrite #= true
+    clockDomain.waitSampling()
+    for (i <- 0 until g.nttPoint / g.BI) {
+      io.outsideAddrOri.valid #= true
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideAddrOri.payload).foreach { case (t1, t2) => t2 #= t1 }
+      clockDomain.waitSampling()
+      io.outsideAddrOri.valid #= false
+    }
+    clockDomain.waitSampling(10)
+    io.isOutSideWrite #= false
+    clockDomain.waitSampling(10)
+
+    io.isOutSideRead #= true
+    clockDomain.waitSampling()
+    for (i <- 0 until g.nttPoint / g.BI) {
+      io.outsideAddrOri.valid #= true
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideAddrOri.payload).foreach { case (t1, t2) => t2 #= t1 }
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
+      clockDomain.waitSampling()
+      io.outsideAddrOri.valid #= false
+    }
+    clockDomain.waitSampling(10)
+    io.isOutSideRead #= false
+    clockDomain.waitSampling(10)
+
+    io.isNtt #= true
+    io.isCal #= true
     clockDomain.waitSampling()
     io.start #= true
     clockDomain.waitSampling()

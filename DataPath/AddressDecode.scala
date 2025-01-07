@@ -190,6 +190,7 @@ case class PreCal(g: NttCfg2414) extends Component {
 
   uAddrDecode.io.addrOri := io.oriAddr
   val addr_dec = uAddrDecode.io.BankBus
+  val datainDelay = Delay(io.dataIn,g.DecodeLatency)
 
   val reorder = new Area{
     val clusterAddr = Vec(for (i <- 0 until g.BI) yield { addr_dec(i).BankAddr})
@@ -200,7 +201,7 @@ case class PreCal(g: NttCfg2414) extends Component {
       clusterAddr.read(idx)
     }
     def dataMux(idx: UInt): Bits = {
-      io.dataIn.read(idx)
+      datainDelay.read(idx)
     }
     io.AddrBus.zip(shuffleIdx).map { case (t1, t2) => t1 := addrMux(t2) }
     io.dataBus.zip(shuffleIdx).map { case (t1, t2) => t1 := dataMux(t2) }
