@@ -4,14 +4,16 @@ import Ntt.NttCfg.NttCfg2414
 import spinal.core._
 import spinal.core.sim._
 import spinal.lib._
+import spinal.lib.eda.bench.Rtl
+import spinal.lib.eda.xilinx.VivadoFlow
 import spinal.lib.fsm.{State, StateMachine}
 
-
-case class writeBackCtrl(g:NttCfg2414) extends Component{
-  val io = new Bundle{
-    val start = in Bool ()
+case class writeBackCtrl(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val wctrlStart = in Bool ()
     val isNtt = in Bool ()
     val idle = out Bool ()
+    val isOutside = in Bool ()
     val wrAddrOri = master Flow Vec(UInt(g.Log2NttPoints bits), g.BI)
   }
   val loopCnt = Reg(UInt(log2Up(g.nttPoint / g.BI) bits)) init U(0)
@@ -21,13 +23,14 @@ case class writeBackCtrl(g:NttCfg2414) extends Component{
   val Thermal_shifter = Reg(Bits(g.Log2NttPoints bits)) init 0
 
   val constSeq = (0 until g.paraNum).map { U(_, log2Up(g.paraNum) bits) }
+  val outsideWriteSeq = (0 until g.BI).map { U(_, log2Up(g.BI) bits) }
   val fsm = new StateMachine {
     //    setEncoding(binaryOneHot)
     val IDLE = makeInstantEntry()
     val LOOP = new State
     IDLE
       .whenIsActive {
-        when(io.start)(goto(LOOP))
+        when(io.wctrlStart)(goto(LOOP))
       }
     LOOP
       .onEntry {
@@ -41,6 +44,7 @@ case class writeBackCtrl(g:NttCfg2414) extends Component{
       }
       .whenIsActive {
         when(loopCnt === loopCnt.maxValue) {
+          when(io.isOutside) { goto(IDLE) }
           OH_shifter := io.isNtt ? (OH_shifter |>> 1) | (OH_shifter |<< 1)
           Thermal_shifter := io.isNtt ? (B"1'b1" ## Thermal_shifter(Thermal_shifter.high downto 1)) | (Thermal_shifter(
             Thermal_shifter.high - 1 downto 0
@@ -50,7 +54,9 @@ case class writeBackCtrl(g:NttCfg2414) extends Component{
           loopCnt := U(0)
         } otherwise (loopCnt := loopCnt + 1)
         when(loopCnt === loopCnt.maxValue) {
-          when(stageCnt === (g.Log2NttPoints - 1)) { goto(IDLE) } otherwise { stageCnt := stageCnt + 1 }
+          when(stageCnt === (g.Log2NttPoints - 1) && !(io.isOutside)) { goto(IDLE) } otherwise {
+            stageCnt := stageCnt + 1
+          }
         }
       }
     when(isNext(IDLE)) {
@@ -87,8 +93,9 @@ case class writeBackCtrl(g:NttCfg2414) extends Component{
   }
   import subDut._
   val flatWrSeq = Vec((Seq0.zip(Seq1)).flatMap { case (t1, t2) => Seq(t1.asUInt, t2.asUInt) })
+  val flatOutsideWriteSeq = Vec(outsideWriteSeq.map { item => Cat(loopCnt, item).asUInt })
   io.idle := fsm.isActive(fsm.IDLE)
-  io.wrAddrOri.payload := flatWrSeq
+  io.wrAddrOri.payload := io.isOutside ? flatOutsideWriteSeq | flatWrSeq
   io.wrAddrOri.valid := fsm.isActive(fsm.LOOP)
 }
 
@@ -99,7 +106,21 @@ object writeBackCtrlGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/CtrlPath/",
     genLineComments = true
-  ).generate(new writeBackCtrl(NttCfg2414(paraNum = 4,debug = false)))
+  ).generate(new writeBackCtrl(NttCfg2414(paraNum = 4, debug = false)))
+}
+object writeBackCtrlVivadoFlow extends App {
+  val workspace = "./vivado_prj/Ntt/Ctrl/writeBackCtrl"
+  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
+  val family = "Zynq UltraScale+ MPSoCS"
+  val device = "xczu9eg-ffvb1156-2-i"
+  val frequency = 300 MHz
+  val cpu = 12
+  val rtl = new Rtl {
+    override def getName(): String = "writeBackCtrl"
+    override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/CtrlPath/writeBackCtrl.v"
+  }
+  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
+  println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea}")
 }
 
 object writeBackCtrlSim extends App {
@@ -108,22 +129,30 @@ object writeBackCtrlSim extends App {
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)
+    io.isOutside #= false
     clockDomain.forkStimulus(period)
     clockDomain.waitSampling(10)
-    io.start #= true
+    io.wctrlStart #= true
     io.isNtt #= true
     clockDomain.waitSampling()
-    io.start #= false
+    io.wctrlStart #= false
     clockDomain.waitSampling(10)
     clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
     clockDomain.waitSampling(10)
     io.isNtt #= false
-    io.start #= true
+    io.wctrlStart #= true
     clockDomain.waitSampling()
-    io.start #= false
+    io.wctrlStart #= false
     clockDomain.waitSampling(10)
     clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
     clockDomain.waitSampling(10)
+    io.isOutside #= true
+    io.wctrlStart #= true
+    clockDomain.waitSampling()
+    io.wctrlStart #= false
+    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
+    clockDomain.waitSampling(10)
+
     simSuccess()
   }
 }

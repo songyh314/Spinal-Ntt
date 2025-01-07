@@ -7,10 +7,12 @@ object NttCfg {
   case class NttCfg2414(nttPoint: Int = 1024, paraNum: Int = 4, debug: Boolean = true) {
     val M = 24
     val N = 14
-    val ramLatency = 1
+    val useBramIP = false
+    val ramLatency = 2
     val AddSubLatencyIntt = 2
     val AddSubLatencyNtt = 1
     val MultLatency = 4
+    val DecodeLatency = 1
     val FastModLatency = 3
     val BfuLatencySt1 = AddSubLatencyIntt
     val BfuLatencySt2 = MultLatency + FastModLatency
@@ -25,9 +27,9 @@ object NttCfg {
     val Log2NttPoints = log2Up(nttPoint)
     val BankIndexWidth = log2Up(BI)
     val BankAddrWidth = Log2NttPoints - BankIndexWidth
-    val twNum = nttPoint/paraNum
-    val twAddrWidth = log2Up(nttPoint/paraNum)
-    val twWidth = width*paraNum
+    val twNum = nttPoint / paraNum
+    val twAddrWidth = log2Up(nttPoint / paraNum)
+    val twWidth = width * paraNum
 //    val twInitSeq = (0 until nttPoint).map(B(_,width bits)).grouped(paraNum).map(item => Cat(item)).toSeq
     val BfuNttDelay = AddSubLatencyNtt + MultLatency + FastModLatency
     val BfuInttDelay = AddSubLatencyIntt + MultLatency + FastModLatency

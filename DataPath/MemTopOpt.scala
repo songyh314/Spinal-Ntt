@@ -11,7 +11,7 @@ case class MemTopOpt(g: NttCfg2414) extends Component {
   val io = new Bundle {
     val isOutSideRead = in Bool ()
     val isOutSideWrite = in Bool ()
-    val isNtt = in Bool ()
+//    val isNtt = in Bool ()
     val RdAddrOri = slave Flow Vec(UInt(g.Log2NttPoints bits), g.BI)
     val RdDataArray = master Flow Vec(UInt(g.width bits), g.BI)
     val WrBus = slave Flow ParaWriteBus(DataWidth = g.width, AddrWidth = g.Log2NttPoints, para = g.BI)
@@ -22,19 +22,12 @@ case class MemTopOpt(g: NttCfg2414) extends Component {
   }
   noIoPrefix()
 
-  // -----------------------------------------------------------
-  // ReadAddr->Decode(pip)->AddrMux(cb)->mem(Data)->WrBackArb(cb)->isOutsideRead?io|Bfu
-  // AddrMux  -> Delay -> mem(WriteBack)
-  // Bfu(pip) -> Mux -> mem(WriteBack)
-  // isOutsideWrite: WrAddr -> Decode -> AddrMux -> mem
-  // -----------------------------------------------------------
-
-  private def genFlow[T <: Data](dataIn: T, valid: Bool): Flow[T] = {
-    val ret = Flow(cloneOf(dataIn))
-    ret.payload := dataIn
-    ret.valid := valid
-    ret
-  }
+//  private def genFlow[T <: Data](dataIn: T, valid: Bool): Flow[T] = {
+//    val ret = Flow(cloneOf(dataIn))
+//    ret.payload := dataIn
+//    ret.valid := valid
+//    ret
+//  }
 
   val mem = new memBank(g)
   val mem_rd_IF = Array.fill(g.BI)(new myRamReadOnly(config = myRamConfig(g.width, g.BankAddrWidth)))
@@ -53,16 +46,17 @@ case class MemTopOpt(g: NttCfg2414) extends Component {
   val tw = new Area {
     val rom = new twRom(g)
     rom.io.twBus := io.twBus
+//    io.NttPayload.toSeq.zip(rom.io.twData).foreach{case(t1,t2) => t1.payload.Tw := t2}
   }
 
   mem_rd_IF.toSeq.zip(rdCal.rdAddrDec).foreach { case (t1, t2) =>
-    t1.rAddr := t2; t1.re := rdCal.re
+    t1.rAddr := t2; t1.re := Delay(rdCal.re, g.DecodeLatency)
   }
   val ValidDelaySeq = Reg(Bits(g.BfuInttDelay + g.ramLatency bits)) init (0)
   ValidDelaySeq := ValidDelaySeq(g.BfuInttDelay + g.ramLatency - 1 downto 1) ## io.RdAddrOri.valid
   val deMuxPayload = Vec(mem_rd_IF.map(item => item.rData).toSeq)
   val dataDeMux = DataDeMux(deMuxPayload, Vec(rdCal.rdIdxDelay.subdivideIn(g.BI slices).map(_.asUInt)))
-  val rdValidDelay = Delay(io.RdAddrOri.valid, g.ramLatency)
+  val rdValidDelay = Delay(io.RdAddrOri.valid, (g.ramLatency + g.DecodeLatency))
   io.RdDataArray.payload.zip(dataDeMux).foreach { case (t1, t2) => t1 := t2.asUInt }
   io.RdDataArray.valid := rdValidDelay && io.isOutSideRead
 
@@ -86,7 +80,7 @@ case class MemTopOpt(g: NttCfg2414) extends Component {
 
   mem_wr_IF.toSeq.zip(wrCal.wrMemPreCal.io.dataBus).foreach { case (t1, t2) => t1.wData := t2 }
   mem_wr_IF.toSeq.zip(wrCal.wrMemPreCal.io.AddrBus).foreach { case (t1, t2) => t1.wAddr := t2 }
-  mem_wr_IF.foreach(item => item.we := io.isOutSideWrite ? io.WrBus.valid | io.wrAddrOri.valid)
+  mem_wr_IF.foreach(item => item.we := Delay(io.isOutSideWrite ? io.WrBus.valid | io.wrAddrOri.valid, g.DecodeLatency))
   mem.io.memIf.zip(mem_rd_IF.toSeq).foreach { case (t1, t2) => t1 << t2 }
   mem.io.memIf.zip(mem_wr_IF.toSeq).foreach { case (t1, t2) => t1 << t2 }
 }
@@ -102,7 +96,7 @@ object MemTopOptGenV extends App {
 
 object memTopOptSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new MemTopOpt(NttCfg2414()))
+  val dut = SimConfig.withXSim.withWave.compile(new MemTopOpt(NttCfg2414(nttPoint = 64)))
   dut.doSim("test") { dut =>
     SimTimeout(1000 * period)
     import dut._
@@ -114,17 +108,42 @@ object memTopOptSim extends App {
     io.twBus.valid #= false
     io.wrAddrOri.valid #= false
     clockDomain.waitSampling(10)
-    for (i <- 0 until g.nttPoint/g.BI){
+    for (i <- 0 until g.nttPoint / g.BI) {
       io.WrBus.valid #= true
       io.isOutSideWrite #= true
-      (0 until g.BI).map{j => g.BI*i + j}.zip(io.WrBus.payload.Addr).foreach{case(t1,t2) => t2 #= t1}
-      (0 until g.BI).map{j => g.BI*i + j}.zip(io.WrBus.payload.Data).foreach{case(t1,t2) => t2 #= t1}
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.WrBus.payload.Addr).foreach { case (t1, t2) => t2 #= t1 }
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.WrBus.payload.Data).foreach { case (t1, t2) => t2 #= t1 }
       clockDomain.waitSampling()
-      io.wrAddrOri.valid#= false
+      io.WrBus.valid #= false
+    }
+    clockDomain.waitSampling(10)
+    for (i <- 0 until g.nttPoint / g.BI) {
+      io.isOutSideRead #= true
+      io.RdAddrOri.valid #= true
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.RdAddrOri.payload).foreach { case (t1, t2) => t2 #= t1 }
+      clockDomain.waitSampling()
+      io.RdAddrOri.valid #= false
+    }
+    clockDomain.waitSampling(10)
+    for (i <- 0 until g.nttPoint / g.BI) {
+      io.isOutSideRead #= false
+      io.RdAddrOri.valid #= true
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.RdAddrOri.payload).foreach { case (t1, t2) => t2 #= t1 }
+      clockDomain.waitSampling()
+      io.RdAddrOri.valid #= false
+    }
+    clockDomain.waitSampling(10)
+    for (i <- 0 until g.nttPoint / g.paraNum) {
+      io.twBus.valid #= true
+      io.twBus.payload.twAddr #= i
+      (0 until g.paraNum).zip(io.twBus.payload.twMux).foreach { case (t1, t2) => t2 #= t1 }
+      clockDomain.waitSampling()
+      io.twBus.valid #= false
     }
     clockDomain.waitSampling(10)
   }
 }
+
 
 object MemTopOptVivadoFlow extends App {
   val workspace = "./vivado_prj/Ntt/DataPath/Mem/MemTop"

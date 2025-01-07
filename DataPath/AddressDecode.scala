@@ -174,6 +174,41 @@ case class reOrder(idxWidth: Int, dataWidth: Int, addrWidth: Int, n: Int, useDat
   }
 }
 
+//对外部读取地址进行译码,输出mem的接口数据
+//*mem读出的数据仍需要过一遍mux进行重排
+//对外部输入数据的地址和数据进行译码和重排
+case class PreCal(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val oriAddr = in Vec (UInt(log2Up(g.nttPoint) bits), g.BI)
+    val dataIn = in Vec (Bits(g.width bits), g.BI)
+    val AddrBus = out Vec (UInt(g.BankAddrWidth bits), g.BI)
+    val idxTrans = out Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val idxShuffleTrans = out Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val dataBus = out Vec (Bits(g.width bits), g.BI)
+  }
+  val uAddrDecode = new AddrDecode(g)
+
+  uAddrDecode.io.addrOri := io.oriAddr
+  val addr_dec = uAddrDecode.io.BankBus
+
+  val reorder = new Area{
+    val clusterAddr = Vec(for (i <- 0 until g.BI) yield { addr_dec(i).BankAddr})
+    val clusterIdx = Vec(for (j <- 0 until g.BI) yield { addr_dec(j).BankIdx })
+    val shuffleIdx = idxShuffle(clusterIdx)
+
+    def addrMux(idx: UInt): UInt = {
+      clusterAddr.read(idx)
+    }
+    def dataMux(idx: UInt): Bits = {
+      io.dataIn.read(idx)
+    }
+    io.AddrBus.zip(shuffleIdx).map { case (t1, t2) => t1 := addrMux(t2) }
+    io.dataBus.zip(shuffleIdx).map { case (t1, t2) => t1 := dataMux(t2) }
+    io.idxTrans := clusterIdx
+    io.idxShuffleTrans := shuffleIdx
+  }
+}
+
 case class memPreCal(g: NttCfg2414, useData: Boolean) extends Component {
   val io = new Bundle {
     val oriAddr = in Vec (UInt(log2Up(g.nttPoint) bits), g.BI)
@@ -185,7 +220,7 @@ case class memPreCal(g: NttCfg2414, useData: Boolean) extends Component {
     else null
   }
   val uAddrDecode = new AddrDecode(g)
-  val uAddrMux = new AddrMux(g)
+//  val uAddrMux = new AddrMux(g)
   uAddrDecode.io.addrOri := io.oriAddr
   val addr_dec = uAddrDecode.io.BankBus
   private val reOrderInst = new reOrder(
@@ -198,7 +233,7 @@ case class memPreCal(g: NttCfg2414, useData: Boolean) extends Component {
   reOrderInst.io.BankBus := addr_dec
   io.AddrBus := reOrderInst.io.AddrBus
   if (useData) {
-    reOrderInst.io.dataIn := io.dataIn
+    reOrderInst.io.dataIn := RegNext(io.dataIn)
     io.dataBus := reOrderInst.io.dataBus
   } else {
     io.idxTrans := reOrderInst.io.idxTrans
@@ -220,7 +255,7 @@ object reOrderGenV extends App {
     targetDirectory = "./rtl/Ntt/DataPath"
   ).generate(new reOrder(3, 24, 7, 8, false))
 }
-case class DataDeMux(dataWidth:Int,idxWidth:Int,n:Int) extends Component {
+case class DataDeMux(dataWidth: Int, idxWidth: Int, n: Int) extends Component {
   val io = new Bundle {
     val DataBus = in Vec (Bits(dataWidth bits), n)
     val IdxTrans = in Vec (UInt(idxWidth bits), n)
@@ -233,11 +268,11 @@ case class DataDeMux(dataWidth:Int,idxWidth:Int,n:Int) extends Component {
   io.DataDeMux.zip(io.IdxTrans).foreach { case (t1, t2) => t1 := (DeMux(t2)) }
 }
 object DataDeMux {
-  def apply(dataIn:Vec[Bits],idx:Vec[UInt]) = {
+  def apply(dataIn: Vec[Bits], idx: Vec[UInt]) = {
     val dataW = dataIn.head.getWidth
     val idxW = idx.head.getWidth
     val n = dataIn.size
-    val dut = new DataDeMux(dataW,idxW,n)
+    val dut = new DataDeMux(dataW, idxW, n)
     dut.io.DataBus := dataIn
     dut.io.IdxTrans := idx
     dut.io.DataDeMux
@@ -318,14 +353,14 @@ case class rdAddrMux2(g: NttCfg2414) extends Component {
 
 object DecodeUnitSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new DecodeUnit(NttCfg2414()))
+  val dut = SimConfig.withXSim.withWave.compile(new DecodeUnit(NttCfg2414(nttPoint = 128)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(1000 * period)
     clockDomain.forkStimulus(period)
     io.unitAddrOri #= 0
     clockDomain.waitSampling(10)
-    for (i <- 0 until (512)) {
+    for (i <- 0 until (g.nttPoint)) {
       io.unitAddrOri #= i
       clockDomain.waitSampling()
     }

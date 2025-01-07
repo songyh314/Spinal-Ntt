@@ -221,9 +221,9 @@ case class Ctrl(g: NttCfg2414) extends Component {
     val probe = uDec.io.BankBus.simPublic()
   }
 
-  io.TwBus.payload.twAddr := twAddr.asUInt
-  io.TwBus.payload.twMux.zip(twMuxArray.toSeq).foreach { case (t1, t2) => t1 := t2.io.twMuxUnit }
-  io.TwBus.valid := fsm.isActive(fsm.LOOP)
+  io.TwBus.payload.twAddr := Delay(twAddr.asUInt,g.DecodeLatency)
+  io.TwBus.payload.twMux.zip(twMuxArray.toSeq).foreach { case (t1, t2) => t1 := Delay(t2.io.twMuxUnit,g.DecodeLatency) }
+  io.TwBus.valid := Delay(fsm.isActive(fsm.LOOP),g.DecodeLatency)
 }
 
 object CtrlGenV extends App {
@@ -257,7 +257,7 @@ object TwMuxGenV extends App {
 
 object CtrlSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new Ctrl(NttCfg2414(nttPoint = 128, paraNum = 16)))
+  val dut = SimConfig.withXSim.withWave.compile(new Ctrl(NttCfg2414(nttPoint = 128, paraNum = 4)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)

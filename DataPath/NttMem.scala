@@ -7,23 +7,50 @@ import spinal.lib._
 import spinal.lib.eda.bench.Rtl
 import spinal.lib.eda.xilinx.VivadoFlow
 
-case class DataMem(width: Int, addrWidth: Int, latency: Int = 1) extends Component {
+case class DataMem(width: Int, addrWidth: Int, latency: Int = 1, useIP: Boolean = false) extends Component {
   val io = new Bundle {
     val memIf = slave(myRamIF(config = myRamConfig(width, addrWidth, latency)))
   }
-  val mem = Mem(Bits(width bits), 1 << (addrWidth)).addAttribute("ram_style", "block")
-  if (latency == 1) {
-    mem.write(io.memIf.wAddr, io.memIf.wData, io.memIf.we)
-    io.memIf.rData := mem.readSync(io.memIf.rAddr, io.memIf.re)
-  } else if (latency == 2) {
-    val wrAddr = RegNext(io.memIf.wAddr)
-    val wData = RegNext(io.memIf.wData)
-    val we = RegNext(io.memIf.we)
-    val rdAddr = RegNext(io.memIf.rAddr)
-    val re = RegNext(io.memIf.re)
-    mem.write(wrAddr, wData, we)
-    io.memIf.rData := mem.readSync(rdAddr, re)
+  if (useIP) {
+    val _ = new Area {
+      val bram = new bram()
+      bram.io.addra := io.memIf.wAddr
+      bram.io.dina := io.memIf.wData
+      bram.io.wea := io.memIf.we
+      bram.io.addrb := io.memIf.rAddr
+      io.memIf.rData := bram.io.doutb
+      bram.io.enb := io.memIf.re
+    }
+  } else {
+    val mem = Mem(Bits(width bits), 1 << (addrWidth)).addAttribute("ram_style", "block")
+    if (latency == 1) {
+      mem.write(io.memIf.wAddr, io.memIf.wData, io.memIf.we)
+      io.memIf.rData := mem.readSync(io.memIf.rAddr, io.memIf.re)
+    } else if (latency == 2) {
+      val wrAddr = RegNext(io.memIf.wAddr)
+      val wData = RegNext(io.memIf.wData)
+      val we = RegNext(io.memIf.we)
+      val rdAddr = RegNext(io.memIf.rAddr)
+      val re = RegNext(io.memIf.re)
+      mem.write(wrAddr, wData, we)
+      io.memIf.rData := mem.readSync(rdAddr, re)
+    }
   }
+
+}
+case class bram(width: Int = 24, addrWidth: Int = 7, depth: Int = 128) extends BlackBox {
+  val io = new Bundle {
+    val clk = in Bool ()
+    val wea = in Bool ()
+    val addra = in UInt (addrWidth bits)
+    val dina = in Bits (width bits)
+    val enb = in Bool ()
+    val addrb = in UInt (addrWidth bits)
+    val doutb = out Bits (width bits)
+  }
+  noIoPrefix()
+  mapClockDomain(clock = io.clk)
+  addRTLPath("/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/bram.v")
 }
 
 case class twRom(g: NttCfg2414) extends Component {
@@ -46,6 +73,7 @@ case class twRom(g: NttCfg2414) extends Component {
     B(ret, g.twWidth bits)
   }
 
+//  val rom = Mem(Bits(g.twWidth bits),g.nttPoint/g.paraNum)
   val rom = Mem(Bits(g.twWidth bits), initialContent = initTable)
   val muxReg = RegNextWhen(io.twBus.payload.twMux, io.twBus.valid)
   val readSeq = rom.readSync(io.twBus.payload.twAddr, io.twBus.valid)
@@ -70,7 +98,7 @@ case class memBank(g: NttCfg2414) extends Component {
   val io = new Bundle {
     val memIf = Array.fill(g.BI)(slave(myRamIF(config = myRamConfig(g.width, g.BankAddrWidth))))
   }
-  val memArray = Array.fill(g.BI)(new DataMem(g.width, g.BankAddrWidth, g.ramLatency))
+  val memArray = Array.fill(g.BI)(new DataMem(g.width, g.BankAddrWidth, g.ramLatency, useIP = g.useBramIP))
   io.memIf.zip(memArray.map(_.io.memIf)).foreach { case (t, t1) => t >> t1 }
 }
 
