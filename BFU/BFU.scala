@@ -11,32 +11,45 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
-class Bfu(g: NttCfg2414) extends Component {
+class Bfu(g: NttCfg2414, debug: Boolean = false) extends Component {
   val io = new Bundle {
     val isNtt = in Bool ()
     val dataIn = slave Flow (BfuPayload(g))
     val dataOut = master Flow (DataPayload(g))
   }
   import io._
-  val uAddSub = new AddSub(g)
-  val uModMult = new ModMult(g)
-  val DelayOutSt1 = Delay(io.dataIn.Tw, g.BfuLatencySt1).addAttribute("srl_style","srl")
-  val DelayOutSt2 = Delay(io.isNtt ? io.dataIn.A | uAddSub.io.dataOut.A, g.BfuLatencySt2)
+  val debugArea = if (debug) {
+    new Area {
+      dataOut.A := io.isNtt ? Delay(io.dataIn.payload.A, g.BfuNttDelay) | Delay(io.dataIn.payload.A, g.BfuInttDelay)
+      dataOut.B := io.isNtt ? Delay(io.dataIn.payload.B, g.BfuNttDelay) | Delay(io.dataIn.payload.B, g.BfuInttDelay)
+      dataOut.valid := io.isNtt ? Delay(io.dataIn.valid, g.BfuNttDelay) | Delay(io.dataIn.valid, g.BfuInttDelay)
+    }
+  } else { null }
 
-  uModMult.io.dataIn.valid := isNtt ? io.dataIn.valid | uAddSub.io.dataOut.valid
-  uModMult.io.dataIn.payload.data := isNtt ? io.dataIn.payload.B | uAddSub.io.dataOut.B
-  uModMult.io.dataIn.payload.tw := isNtt ? io.dataIn.payload.Tw | DelayOutSt1
+  val funcArea = if (!debug) {
+    new Area {
+      val uAddSub = new AddSub(g)
+      val uModMult = new ModMult(g)
+      val DelayOutSt1 = Delay(io.dataIn.Tw, g.BfuLatencySt1).addAttribute("srl_style", "srl")
+      val DelayOutSt2 =
+        Delay(io.isNtt ? io.dataIn.A | uAddSub.io.dataOut.A, g.BfuLatencySt2).addAttribute("srl_style", "srl")
 
-  uAddSub.io.isRescale := !io.isNtt
-  uAddSub.io.dataIn.valid := isNtt ? uModMult.io.dataOut.valid | io.dataIn.valid
-  uAddSub.io.dataIn.A := isNtt ? DelayOutSt2 | io.dataIn.A
-  uAddSub.io.dataIn.B := isNtt ? uModMult.io.dataOut.payload | io.dataIn.B
+      uModMult.io.dataIn.valid := isNtt ? io.dataIn.valid | uAddSub.io.dataOut.valid
+      uModMult.io.dataIn.payload.data := isNtt ? io.dataIn.payload.B | uAddSub.io.dataOut.B
+      uModMult.io.dataIn.payload.tw := isNtt ? io.dataIn.payload.Tw | DelayOutSt1
 
-  io.dataOut.A := isNtt ? uAddSub.io.dataOut.A | DelayOutSt2
-  io.dataOut.B := isNtt ? uAddSub.io.dataOut.B | uModMult.io.dataOut.payload
-  io.dataOut.valid := isNtt ? uAddSub.io.dataOut.valid | uModMult.io.dataOut.valid
+      uAddSub.io.isRescale := !io.isNtt
+      uAddSub.io.dataIn.valid := isNtt ? uModMult.io.dataOut.valid | io.dataIn.valid
+      uAddSub.io.dataIn.A := isNtt ? DelayOutSt2 | io.dataIn.A
+      uAddSub.io.dataIn.B := isNtt ? uModMult.io.dataOut.payload | io.dataIn.B
+
+      io.dataOut.A := isNtt ? uAddSub.io.dataOut.A | DelayOutSt2
+      io.dataOut.B := isNtt ? uAddSub.io.dataOut.B | uModMult.io.dataOut.payload
+      io.dataOut.valid := isNtt ? uAddSub.io.dataOut.valid | uModMult.io.dataOut.valid
+    }
+  } else { null }
+
 }
-
 
 object BfuGold extends App {
   val g = NttCfg2414()
@@ -52,12 +65,12 @@ object BfuGold extends App {
         subRes = subRes / 2 + NttCfg2414().HalfPrime
       } else { subRes = subRes / 2 }
     }
-    if(debug) println(s"add : $addRes , subu : $subRes")
+    if (debug) println(s"add : $addRes , subu : $subRes")
     (addRes, subRes)
   }
   def ModMult(A: BigInt, B: BigInt): BigInt = {
     val ret = (A * B) % NttCfg2414().Prime
-    if(debug) println(s"modmult res : $ret")
+    if (debug) println(s"modmult res : $ret")
     ret
   }
   def Bfu(A: BigInt, B: BigInt, Tw: BigInt, isNtt: Boolean): (BigInt, BigInt) = {
@@ -162,7 +175,7 @@ case class BfuSim() extends Bfu(NttCfg2414()) {
 }
 object BfuGenV extends App {
   SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "./rtl/Ntt/Bfu")
-    .generate(new Bfu(NttCfg2414()))
+    .generate(new Bfu(NttCfg2414(),debug = true))
 }
 
 object BfuSimFlow extends App {
@@ -202,7 +215,7 @@ object BfuVivadoFlow extends App {
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
   val family = "Zynq UltraScale+ MPSoCS"
   val device = "xczu9eg-ffvb1156-2-i"
-  val frequency = 300 MHz
+  val frequency = 400 MHz
   val cpu = 12
   val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
   val paths = Seq(

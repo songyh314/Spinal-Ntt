@@ -17,7 +17,6 @@ case class MemTopOpt1(g: NttCfg2414) extends Component {
     val outsideAddrOri = slave Flow Vec(UInt(g.Log2NttPoints bits), g.BI)
     val outsideRdDataArray = master Flow Vec(Bits(g.width bits), g.BI)
     val outsideWrDataArray = slave Flow Vec(Bits(g.width bits), g.BI)
-//    val WrBus = slave Flow ParaWriteBus(DataWidth = g.width, AddrWidth = g.Log2NttPoints, para = g.BI)
     val bfuRdAddrOri = slave Flow Vec(UInt(g.Log2NttPoints bits), g.BI)
     val NttPayload = Array.fill(g.paraNum)(master Flow BfuPayload(g))
     val NttWriteBack = Array.fill(g.paraNum)(slave Flow DataPayload(g))
@@ -29,17 +28,6 @@ case class MemTopOpt1(g: NttCfg2414) extends Component {
   val mem = new memBank(g)
   val mem_rd_IF = Array.fill(g.BI)(new myRamReadOnly(config = myRamConfig(g.width, g.BankAddrWidth)))
   val mem_wr_IF = Array.fill(g.BI)(new myRamWriteOnly(config = myRamConfig(g.width, g.BankAddrWidth)))
-
-  // Input: Addr 10bit
-  // Output: Mem Read Addr(7bit) & idx(3bit)
-//  val rdCal = new Area {
-//    val rdMemPreCal = new memPreCal(g, false)
-//    rdMemPreCal.io.oriAddr := io.RdAddrOri.payload
-//    val rdAddrDec = rdMemPreCal.io.AddrBus
-//    val rdIdxTrans = rdMemPreCal.io.idxTrans
-//    val rdIdxDelay = Delay(Cat(rdIdxTrans), g.ramLatency).addAttribute("srl_style", "srl")
-//    val re = io.RdAddrOri.valid
-//  }
 
   val preCal = new Area {
     val preCalInst = new PreCal(g)
@@ -65,9 +53,11 @@ case class MemTopOpt1(g: NttCfg2414) extends Component {
   }
 
   val deMuxPayload = Vec(mem_rd_IF.map(item => item.rData).toSeq)
-  val dataDeMux = DataDeMux(deMuxPayload, Vec(preCal.sel4mem_rd_demux_delay.subdivideIn(g.BI slices).map(_.asUInt)))
+  val dataDeMux = RegNext(
+    DataDeMux(deMuxPayload, Vec(preCal.sel4mem_rd_demux_delay.subdivideIn(g.BI slices).map(_.asUInt)))
+  )
   val rdValidDelay = Delay(preCal.re, (g.ramLatency + g.DecodeLatency))
-  val wrValidDelay = Delay(preCal.we, (g.DecodeLatency))
+  val wrValidDelay = Delay(preCal.we, (g.DecodeLatency + g.DatDeMuxLatency))
   io.outsideRdDataArray.payload.zip(dataDeMux).foreach { case (t1, t2) => t1 := t2 }
   io.outsideRdDataArray.valid := rdValidDelay && io.isOutSideRead
 
@@ -78,18 +68,26 @@ case class MemTopOpt1(g: NttCfg2414) extends Component {
   io.NttPayload.toSeq.zip(tw.rom.io.twData).foreach { case (t1, t2) => t1.payload.Tw := t2 }
 
   val innerDelay = new Area {
-    val bfuValidDelay = Reg(Bits(g.BfuInttDelay + g.ramLatency  + g.DecodeLatency bits)) init (0)
-    bfuValidDelay := bfuValidDelay(g.BfuInttDelay  + g.DecodeLatency + g.ramLatency - 2 downto 0) ## preCal.re
+    val bfuValidDelay = Reg(
+      Bits(g.bfuValidLoopLatency bits)
+    ) init (0)
+    bfuValidDelay := bfuValidDelay(
+      g.bfuValidLoopLatency - 2 downto 0
+    ) ## preCal.re
     val memAddrDelaySt1 =
-      Delay(preCal.memOpAddr, (g.ramLatency + g.BfuNttDelay)).addAttribute("srl_style", "srl")
+      Delay(preCal.memOpAddr, g.addrNttLoopLatency).addAttribute("srl_style", "srl_reg")
     val memAddrDelaySt2 = Delay(memAddrDelaySt1, (g.BfuInttDelay - g.BfuNttDelay))
     val memMuxDealySt1 = {
-      Delay(preCal.sel4mem_wr_mux, (g.ramLatency + g.BfuNttDelay)).addAttribute("srl_style", "srl")
+      Delay(preCal.sel4mem_wr_mux, g.addrNttLoopLatency).addAttribute("srl_style", "srl_reg")
     }
     val memMuxDealySt2 = Delay(memMuxDealySt1, (g.BfuInttDelay - g.BfuNttDelay))
 //    val bfuValid = bfuValidDelay(g.BfuInttDelay + g.ramLatency - 1)
     val bfuValid =
-      io.isNtt ? bfuValidDelay(g.BfuNttDelay + g.DecodeLatency + g.ramLatency - 1) | bfuValidDelay(g.BfuInttDelay + g.DecodeLatency + g.ramLatency - 1)
+      io.isNtt ? bfuValidDelay(
+        g.bfuValidLoopNttLatency - 1
+      ) | bfuValidDelay(
+        g.bfuValidLoopInttLatency - 1
+      )
 //    val memAddr = memAddrDelaySt1.subdivideIn(g.BI slices).map { _.asUInt }
     val memAddr = (io.isNtt ? memAddrDelaySt1 | memAddrDelaySt2)
 //    val memMux = memMuxDealySt1.subdivideIn(g.BI slices).map { _.asUInt }
@@ -119,22 +117,6 @@ case class MemTopOpt1(g: NttCfg2414) extends Component {
   mem_wr_IF.toSeq.zip(wrMem.wrMemData).foreach { case (t1, t2) => t1.wData := t2 }
   mem_wr_IF.toSeq.foreach { item => item.we := wrMem.memWe }
 
-//  val wrCal = new Area {
-//    val wrMemPreCal = new memPreCal(g, true)
-//    when(io.isOutSideWrite) {
-//      wrMemPreCal.io.oriAddr := io.WrBus.payload.Addr
-//      wrMemPreCal.io.dataIn := io.WrBus.payload.Data
-//    } otherwise {
-//      wrMemPreCal.io.oriAddr := io.wrAddrOri.payload
-//      val dutPayload = Vec(io.NttWriteBack.flatMap { item => Seq(item.payload.A, item.payload.B) }.toSeq)
-//      wrMemPreCal.io.dataIn.zip(dutPayload) foreach ({ case (t1, t2) => t1 := t2.asBits })
-//    }
-//  }
-//
-//  mem_wr_IF.toSeq.zip(wrCal.wrMemPreCal.io.dataBus).foreach { case (t1, t2) => t1.wData := t2 }
-//  mem_wr_IF.toSeq.zip(wrCal.wrMemPreCal.io.AddrBus).foreach { case (t1, t2) => t1.wAddr := t2 }
-//  mem_wr_IF.foreach(item => item.we := Delay(io.isOutSideWrite ? io.WrBus.valid | io.wrAddrOri.valid, g.DecodeLatency))
-
   mem.io.memIf.zip(mem_rd_IF.toSeq).foreach { case (t1, t2) => t1 << t2 }
   mem.io.memIf.zip(mem_wr_IF.toSeq).foreach { case (t1, t2) => t1 << t2 }
 }
@@ -145,7 +127,7 @@ object MemTopOpt1GenV extends App {
     nameWhenByFile = false,
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/DataPath/Mem"
-  ).generate(new MemTopOpt1(NttCfg2414()))
+  ).generate(new MemTopOpt1(NttCfg2414(nttPoint = 4096, paraNum = 4)))
 }
 
 object memTopOpt1Sim extends App {
@@ -156,7 +138,7 @@ object memTopOpt1Sim extends App {
     import dut._
     clockDomain.forkStimulus(period)
     dut.io.isOutSideRead #= false
-    io.isNtt  #= true
+    io.isNtt #= true
     io.isOutSideWrite #= false
     io.outsideAddrOri.valid #= false
     io.isCal #= false
@@ -205,12 +187,14 @@ object memTopOpt1Sim extends App {
 }
 
 object MemTopOpt1VivadoFlow extends App {
-  val g= NttCfg2414()
+  val g = NttCfg2414()
   val useIp = false
   val workspace = "./vivado_prj/Ntt/DataPath/Mem/MemTop1"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
   val family = "Zynq UltraScale+ MPSoCS"
   val device = "xczu9eg-ffvb1156-2-i"
+//  val family = "Virtex 7"
+//  val device = "xc7vx485tffg1157-1"
   val frequency = 300 MHz
   val cpu = 12
   val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mem.xcix"
@@ -218,7 +202,7 @@ object MemTopOpt1VivadoFlow extends App {
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/DataPath/Mem/MemTopOpt1.v",
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/bram.v"
   )
-  if (g.useBramIP){
+  if (g.useBramIP) {
     val rtl = new Rtl {
 
       /** Name */

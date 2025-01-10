@@ -128,6 +128,44 @@ object idxShuffle {
     dut.io.shuffleIdx
   }
 }
+
+case class writebackMux(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val dataIn = in Vec (Bits(g.width bits), g.BI)
+    val sel = in Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val dataOut = out Vec (Bits(g.width bits), g.BI)
+  }
+  def mux(sel: UInt): Bits = {
+    io.dataIn.read(sel)
+  }
+  io.dataOut.zip(io.sel).foreach { case (t1, t2) => t1 := mux(t2) }
+}
+object writebackMuxGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "./rtl/Ntt/DataPath"
+  ).generate(new writebackMux(NttCfg2414()))
+}
+object writebackMuxVivadoFlow extends App {
+
+  val workspace = "./vivado_prj/Ntt/DataPath/AddrDecode"
+  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
+  val family = "Zynq UltraScale+ MPSoCS"
+  val device = "xczu9eg-ffvb1156-2-i"
+  val frequency = 300 MHz
+  val cpu = 16
+  val rtl = new Rtl {
+
+    /** Name */
+    override def getName(): String = "writebackMux"
+
+    override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/DataPath/writebackMux.v"
+  }
+  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
+  println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
+}
 case class AddrMux(g: NttCfg2414) extends Component {
   val io = new Bundle {
     val BankBus = in Vec (DecodeBus(idx = g.BankIndexWidth, addr = g.BankAddrWidth), g.BI)
@@ -190,10 +228,10 @@ case class PreCal(g: NttCfg2414) extends Component {
 
   uAddrDecode.io.addrOri := io.oriAddr
   val addr_dec = uAddrDecode.io.BankBus
-  val datainDelay = Delay(io.dataIn,g.DecodeLatency)
+  val datainDelay = Delay(io.dataIn, g.DecodeCalLatency)
 
-  val reorder = new Area{
-    val clusterAddr = Vec(for (i <- 0 until g.BI) yield { addr_dec(i).BankAddr})
+  val reorder = new Area {
+    val clusterAddr = Vec(for (i <- 0 until g.BI) yield { addr_dec(i).BankAddr })
     val clusterIdx = Vec(for (j <- 0 until g.BI) yield { addr_dec(j).BankIdx })
     val shuffleIdx = idxShuffle(clusterIdx)
 
@@ -203,10 +241,10 @@ case class PreCal(g: NttCfg2414) extends Component {
     def dataMux(idx: UInt): Bits = {
       datainDelay.read(idx)
     }
-    io.AddrBus.zip(shuffleIdx).map { case (t1, t2) => t1 := addrMux(t2) }
-    io.dataBus.zip(shuffleIdx).map { case (t1, t2) => t1 := dataMux(t2) }
-    io.idxTrans := clusterIdx
-    io.idxShuffleTrans := shuffleIdx
+    io.AddrBus.zip(shuffleIdx).foreach { case (t1, t2) => t1 := RegNext(addrMux(t2)) }
+    io.dataBus.zip(shuffleIdx).foreach { case (t1, t2) => t1 := RegNext(dataMux(t2)) }
+    io.idxTrans := RegNext(clusterIdx)
+    io.idxShuffleTrans := RegNext(shuffleIdx)
   }
 }
 

@@ -6,9 +6,12 @@ import spinal.lib.eda.bench.Rtl
 import spinal.lib.eda.xilinx.VivadoFlow
 import test._
 import NttCfg._
+import BFU._
 import CTRL._
 import DataPath._
 import myRam._
+
+import scala.collection.mutable.ArrayBuffer
 
 case class addrDecodeTest(g: NttCfg2414) extends Component {
   val io = new Bundle {
@@ -151,6 +154,37 @@ case class ctrlMemOpt1(g: NttCfg2414) extends Component {
 
 }
 
+case class Top(g: NttCfg2414, debug: Boolean = false) extends Component {
+  val io = new Bundle {
+    val start = in Bool ()
+    val isNtt = in Bool ()
+    val idle = out Bool ()
+    val isCal = in Bool ()
+    val isOutSideRead = in Bool ()
+    val isOutSideWrite = in Bool ()
+
+    val outsideAddrOri = slave Flow Vec(UInt(g.Log2NttPoints bits), g.BI)
+    val outsideRdDataArray = master Flow Vec(Bits(g.width bits), g.BI)
+    val outsideWrDataArray = slave Flow Vec(Bits(g.width bits), g.BI)
+  }
+  noIoPrefix()
+  val ctrlMem = new ctrlMemOpt1(g)
+  val bfuArray = new BfuArray(g, debug)
+  io.idle := ctrlMem.io.idle
+  ctrlMem.io.start := io.start
+  ctrlMem.io.isNtt := io.isNtt
+  ctrlMem.io.isCal := io.isCal
+  ctrlMem.io.isOutSideRead := io.isOutSideRead
+  ctrlMem.io.isOutSideWrite := io.isOutSideWrite
+  ctrlMem.io.outsideAddrOri := io.outsideAddrOri
+  io.outsideRdDataArray := ctrlMem.io.outsideRdDataArray
+  ctrlMem.io.outsideWrDataArray := io.outsideWrDataArray
+  bfuArray.io.isNtt := io.isNtt
+  bfuArray.io.dataIn.toSeq.zip(ctrlMem.io.NttPayload.toSeq).foreach { case (t1, t2) => t1 := RegNext(t2) }
+  ctrlMem.io.NttWriteBack.toSeq.zip(bfuArray.io.dataOut.toSeq).foreach { case (t1, t2) => t1 := RegNext(t2) }
+}
+
+
 object ctrlMemGenV extends App {
   SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "./rtl/Ntt/Top/")
     .generate(new ctrlMem(NttCfg2414()))
@@ -236,4 +270,92 @@ object ctrlMemOpt1Sim extends App {
     clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
     clockDomain.waitSampling(10)
   }
+}
+
+
+object TopGenV extends App {
+  SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "./rtl/Ntt/Top/")
+    .generate(new Top(NttCfg2414(nttPoint = 4096, paraNum = 4),debug = false))
+}
+object TopSim extends App {
+  val period = 10
+  val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/")
+  val dut = SimConfig.withXSim
+    .withXilinxDevice("xczu9eg-ffvb1156-2-i")
+    .withXSimSourcesPaths(path, path)
+    .withWave
+    .compile(new Top(NttCfg2414(nttPoint = 128,debug = true)))
+  dut.doSim("test") { dut =>
+    import dut._
+    SimTimeout(1000 * period)
+    clockDomain.forkStimulus(period)
+    io.isNtt #= false
+    io.start #= false
+    io.isCal #= false
+    io.isOutSideRead #= false
+    io.isOutSideWrite #= false
+    clockDomain.waitSampling(10)
+
+    io.isOutSideWrite #= true
+    clockDomain.waitSampling()
+    for (i <- 0 until g.nttPoint / g.BI) {
+      io.outsideAddrOri.valid #= true
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideAddrOri.payload).foreach { case (t1, t2) => t2 #= t1 }
+      clockDomain.waitSampling()
+      io.outsideAddrOri.valid #= false
+    }
+    clockDomain.waitSampling(10)
+    io.isOutSideWrite #= false
+    clockDomain.waitSampling(10)
+
+    io.isOutSideRead #= true
+    clockDomain.waitSampling()
+    for (i <- 0 until g.nttPoint / g.BI) {
+      io.outsideAddrOri.valid #= true
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideAddrOri.payload).foreach { case (t1, t2) => t2 #= t1 }
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
+      clockDomain.waitSampling()
+      io.outsideAddrOri.valid #= false
+    }
+    clockDomain.waitSampling(10)
+    io.isOutSideRead #= false
+    clockDomain.waitSampling(10)
+
+    io.isNtt #= true
+    io.isCal #= true
+    clockDomain.waitSampling()
+    io.start #= true
+    clockDomain.waitSampling()
+    io.start #= false
+    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
+    clockDomain.waitSampling(10)
+  }
+}
+
+object TopVivadoFlow extends App {
+  val g = NttCfg2414()
+  val useIp = false
+  val workspace = "./vivado_prj/Ntt/Top"
+  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
+  val family = "Zynq UltraScale+ MPSoCS"
+  val device = "xczu9eg-ffvb1156-2-i"
+  val frequency = 300 MHz
+  val cpu = 12
+  val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
+  val paths = Seq(
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/Top/Top.v",
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v",
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/Top/Top.v_toplevel_ctrlMem_mem_tw_rom_rom.bin"
+  )
+  val rtl = new Rtl {
+
+    /** Name */
+    override def getName(): String = "MemTopOpt1"
+
+    override def getRtlPaths(): Seq[String] = paths
+  }
+  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu, xcix = xcix)
+  println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
+
 }
