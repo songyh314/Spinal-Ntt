@@ -21,7 +21,7 @@ class AddSub(g: NttCfg2414) extends Component {
     val dataIn = slave Flow (DataPayload(g))
     val dataOut = master Flow (DataPayload(g))
   }
-
+  noIoPrefix()
   import io._
 
   val Add_tmp1 = dataIn.A +^ dataIn.B - g.Prime
@@ -32,9 +32,6 @@ class AddSub(g: NttCfg2414) extends Component {
   val Sub_tmp = (dataIn.A >= dataIn.B) ? Sub_tmp1 | Sub_tmp2
   val addReg = Reg(UInt(g.width bits))
   val subReg = Reg(UInt(g.width bits))
-//  val probe = Vec(UInt(24 bits),2)
-//  probe(0) := g.Prime
-//  probe(1) := g.HalfPrime
   def rescale(A: UInt, sel: Bool = False, valid: Bool): UInt = {
     val ret = UInt(g.width bits)
     ret := (A |>> 1)

@@ -8,7 +8,7 @@ import spinal.lib._
 import spinal.lib.eda.bench.Rtl
 import spinal.lib.eda.xilinx.VivadoFlow
 
-case class MemTopOpt1(g: NttCfg2414) extends Component {
+case class MemTopOpt2(g: NttCfg2414) extends Component {
   val io = new Bundle {
     val isOutSideRead = in Bool ()
     val isOutSideWrite = in Bool ()
@@ -127,12 +127,12 @@ object MemTopOpt1GenV extends App {
     nameWhenByFile = false,
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/DataPath/Mem"
-  ).generate(new MemTopOpt1(NttCfg2414(nttPoint = 4096, paraNum = 4)))
+  ).generate(new MemTopOpt2(NttCfg2414(nttPoint = 4096, paraNum = 4)))
 }
 
 object memTopOpt1Sim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new MemTopOpt1(NttCfg2414(nttPoint = 64)))
+  val dut = SimConfig.withXSim.withWave.compile(new MemTopOpt2(NttCfg2414(nttPoint = 64)))
   dut.doSim("test") { dut =>
     SimTimeout(1000 * period)
     import dut._
@@ -189,7 +189,7 @@ object memTopOpt1Sim extends App {
 object MemTopOpt1VivadoFlow extends App {
   val g = NttCfg2414()
   val useIp = false
-  val workspace = "./vivado_prj/Ntt/DataPath/Mem/MemTop1"
+  val workspace = "./vivado_prj/Ntt/DataPath/Mem/MemTop2"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
   val family = "Zynq UltraScale+ MPSoCS"
   val device = "xczu9eg-ffvb1156-2-i"
@@ -199,14 +199,14 @@ object MemTopOpt1VivadoFlow extends App {
   val cpu = 12
   val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mem.xcix"
   val paths = Seq(
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/DataPath/Mem/MemTopOpt1.v",
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/DataPath/Mem/MemTopOpt2.v",
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/bram.v"
   )
   if (g.useBramIP) {
     val rtl = new Rtl {
 
       /** Name */
-      override def getName(): String = "MemTopOpt1"
+      override def getName(): String = "MemTopOpt2"
       override def getRtlPaths(): Seq[String] = paths
     }
     val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu, xcix = xcix)
@@ -215,8 +215,8 @@ object MemTopOpt1VivadoFlow extends App {
     val rtl = new Rtl {
 
       /** Name */
-      override def getName(): String = "MemTopOpt1"
-      override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/DataPath/Mem/MemTopOpt1.v"
+      override def getName(): String = "MemTopOpt2"
+      override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/DataPath/Mem/MemTopOpt2.v"
     }
     val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
     println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")

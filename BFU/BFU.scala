@@ -30,9 +30,9 @@ class Bfu(g: NttCfg2414, debug: Boolean = false) extends Component {
     new Area {
       val uAddSub = new AddSub(g)
       val uModMult = new ModMult(g)
-      val DelayOutSt1 = Delay(io.dataIn.Tw, g.BfuLatencySt1).addAttribute("srl_style", "srl")
+      val DelayOutSt1 = Delay(io.dataIn.Tw, g.BfuLatencySt1).addAttribute("SRL_STYLE", "SRL_REG")
       val DelayOutSt2 =
-        Delay(io.isNtt ? io.dataIn.A | uAddSub.io.dataOut.A, g.BfuLatencySt2).addAttribute("srl_style", "srl")
+        Delay(io.isNtt ? io.dataIn.A | uAddSub.io.dataOut.A, g.BfuLatencySt2).addAttribute("SRL_STYLE", "SRL_REG")
 
       uModMult.io.dataIn.valid := isNtt ? io.dataIn.valid | uAddSub.io.dataOut.valid
       uModMult.io.dataIn.payload.data := isNtt ? io.dataIn.payload.B | uAddSub.io.dataOut.B
@@ -137,8 +137,9 @@ case class BfuSim() extends Bfu(NttCfg2414()) {
           val calRes = resQueue.dequeue()
           val calRef = refQueue.dequeue()
           assert(calRes == calRef, s"data mismatch input:${drv} res:${calRes}  ref:${calRef}")
+          println(s"data:${drv} res:${calRes}  ref:${calRef}")
           if (calRes != calRef) {
-            println(s"data:${drv} res:${calRes}  ref:${calRef}")
+            println(s"error!: data:${drv} res:${calRes}  ref:${calRef}")
           }
         }
         clockDomain.waitSampling()
@@ -175,12 +176,12 @@ case class BfuSim() extends Bfu(NttCfg2414()) {
 }
 object BfuGenV extends App {
   SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "./rtl/Ntt/Bfu")
-    .generate(new Bfu(NttCfg2414(),debug = true))
+    .generate(new Bfu(NttCfg2414(), debug = false))
 }
 
 object BfuSimFlow extends App {
   val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/")
-  val dut = SimConfig.withXSim.withWave
+  val dut = SimConfig.withXSim
     .withXilinxDevice("xczu9eg-ffvb1156-2-i")
     .withXSimSourcesPaths(path, path)
     .compile(new BfuSim())
@@ -188,19 +189,19 @@ object BfuSimFlow extends App {
   dut.doSim("test") { dut =>
     import dut._
     val g = NttCfg2414()
-    SimTimeout(1000 * period)
+    SimTimeout(5000 * period)
     clockDomain.forkStimulus(period)
     simEnvStart()
     io.isNtt #= true
-    for (i <- 0 until (256)) {
-      val randomA = (BigInt(g.Prime.bitLength, Random) % g.Prime) - 1
-      val randomB = (BigInt(g.Prime.bitLength, Random) % g.Prime) - 1
-      val randomTw = (BigInt(g.Prime.bitLength, Random) % g.Prime) - 1
+    for (i <- 0 until (1024)) {
+      val randomA = ((BigInt(g.Prime.bitLength, Random) + ((g.Prime - 1) / 2)) % g.Prime) - 1
+      val randomB = ((BigInt(g.Prime.bitLength, Random) + ((g.Prime - 1) / 2)) % g.Prime) - 1
+      val randomTw = ((BigInt(g.Prime.bitLength, Random) + ((g.Prime - 1) / 2)) % g.Prime) - 1
       insertData(DrvData(randomA, randomB, randomTw, isNtt = true))
     }
     waitClean()
     io.isNtt #= false
-    for (i <- 0 until (256)) {
+    for (i <- 0 until (1024)) {
       val randomA = (BigInt(g.Prime.bitLength, Random) % g.Prime) - 1
       val randomB = (BigInt(g.Prime.bitLength, Random) % g.Prime) - 1
       val randomTw = (BigInt(g.Prime.bitLength, Random) % g.Prime) - 1

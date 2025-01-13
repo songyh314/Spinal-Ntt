@@ -72,9 +72,9 @@ case class twRom(g: NttCfg2414) extends Component {
 //    println(ret)
     B(ret, g.twWidth bits)
   }
-
+  val tw = g.twCompress.map(B(_,g.twWidth bits))
 //  val rom = Mem(Bits(g.twWidth bits),g.nttPoint/g.paraNum)
-  val rom = Mem(Bits(g.twWidth bits), initialContent = initTable)
+  val rom = Mem(Bits(g.twWidth bits), initialContent = tw)
   val muxReg = RegNextWhen(io.twBus.payload.twMux, io.twBus.valid)
   val readSeq = rom.readSync(io.twBus.payload.twAddr, io.twBus.valid)
   val sliceSeq = readSeq.subdivideIn(g.paraNum slices).map(_.asUInt)

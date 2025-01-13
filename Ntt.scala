@@ -184,7 +184,6 @@ case class Top(g: NttCfg2414, debug: Boolean = false) extends Component {
   ctrlMem.io.NttWriteBack.toSeq.zip(bfuArray.io.dataOut.toSeq).foreach { case (t1, t2) => t1 := RegNext(t2) }
 }
 
-
 object ctrlMemGenV extends App {
   SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "./rtl/Ntt/Top/")
     .generate(new ctrlMem(NttCfg2414()))
@@ -223,10 +222,10 @@ object ctrlMemSim extends App {
 
 object ctrlMemOpt1Sim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new ctrlMemOpt1(NttCfg2414(nttPoint = 128)))
+  val dut = SimConfig.withXSim.withWave.compile(new ctrlMemOpt1(NttCfg2414(nttPoint = 1024)))
   dut.doSim("test") { dut =>
     import dut._
-    SimTimeout(1000 * period)
+    SimTimeout(4000 * period)
     clockDomain.forkStimulus(period)
     io.isNtt #= false
     io.start #= false
@@ -272,10 +271,9 @@ object ctrlMemOpt1Sim extends App {
   }
 }
 
-
 object TopGenV extends App {
   SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "./rtl/Ntt/Top/")
-    .generate(new Top(NttCfg2414(nttPoint = 4096, paraNum = 4),debug = false))
+    .generate(new Top(NttCfg2414(nttPoint = 1024, paraNum = 4), debug = false))
 }
 object TopSim extends App {
   val period = 10
@@ -284,10 +282,10 @@ object TopSim extends App {
     .withXilinxDevice("xczu9eg-ffvb1156-2-i")
     .withXSimSourcesPaths(path, path)
     .withWave
-    .compile(new Top(NttCfg2414(nttPoint = 128,debug = true)))
+    .compile(new Top(NttCfg2414(nttPoint = 1024)))
   dut.doSim("test") { dut =>
     import dut._
-    SimTimeout(1000 * period)
+    SimTimeout(4000 * period)
     clockDomain.forkStimulus(period)
     io.isNtt #= false
     io.start #= false
@@ -314,7 +312,7 @@ object TopSim extends App {
     for (i <- 0 until g.nttPoint / g.BI) {
       io.outsideAddrOri.valid #= true
       (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideAddrOri.payload).foreach { case (t1, t2) => t2 #= t1 }
-      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
+//      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
       clockDomain.waitSampling()
       io.outsideAddrOri.valid #= false
     }
@@ -329,6 +327,21 @@ object TopSim extends App {
     clockDomain.waitSampling()
     io.start #= false
     clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
+    clockDomain.waitSampling(100)
+    io.isCal #= false
+    clockDomain.waitSampling(100)
+
+    io.isOutSideRead #= true
+    clockDomain.waitSampling()
+    for (i <- 0 until g.nttPoint / g.BI) {
+      io.outsideAddrOri.valid #= true
+      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideAddrOri.payload).foreach { case (t1, t2) => t2 #= t1 }
+      //      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
+      clockDomain.waitSampling()
+      io.outsideAddrOri.valid #= false
+    }
+    clockDomain.waitSampling(10)
+    io.isOutSideRead #= false
     clockDomain.waitSampling(10)
   }
 }

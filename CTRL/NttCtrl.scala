@@ -188,7 +188,10 @@ case class Ctrl(g: NttCfg2414) extends Component {
 //        log2Up(g.paraNum)
 //      )) - log2Up(g.nttPoint / g.paraNum) + 1)
 //    ).reversed
-    mask := io.isNtt ? Thermal_shifter(0, log2Up(g.nttPoint / g.paraNum) bits).reversed | Thermal_shifter(1,log2Up(g.nttPoint / g.paraNum) bits).reversed
+    mask := io.isNtt ? Thermal_shifter(0, log2Up(g.nttPoint / g.paraNum) bits).reversed | Thermal_shifter(
+      1,
+      log2Up(g.nttPoint / g.paraNum) bits
+    ).reversed
     val twAddr = io.isNtt ? (mask & loopCntShiftNtt.asBits) | (mask | loopCntShiftIntt.asBits)
     val stageOverflow = io.isNtt ? (stageCntCop >= log2Up(g.paraNum)) | (stageCnt >= log2Up(g.paraNum))
     val shiftCnt = io.isNtt ? { stageOverflow ? (stageCntCop - log2Up(g.paraNum)) | U(0) } | {
@@ -221,9 +224,12 @@ case class Ctrl(g: NttCfg2414) extends Component {
     val probe = uDec.io.BankBus.simPublic()
   }
 
-  io.TwBus.payload.twAddr := Delay(twAddr.asUInt,g.DecodeLatency)
-  io.TwBus.payload.twMux.zip(twMuxArray.toSeq).foreach { case (t1, t2) => t1 := Delay(t2.io.twMuxUnit,g.DecodeLatency) }
-  io.TwBus.valid := Delay(fsm.isActive(fsm.LOOP),g.DecodeLatency)
+  io.TwBus.payload.twAddr := twAddr.asUInt
+//  io.TwBus.payload.twAddr := Delay(twAddr.asUInt,g.DecodeLatency)
+  io.TwBus.payload.twMux.zip(twMuxArray.toSeq).foreach { case (t1, t2) => t1 := t2.io.twMuxUnit }
+//  io.TwBus.payload.twMux.zip(twMuxArray.toSeq).foreach { case (t1, t2) => t1 := Delay(t2.io.twMuxUnit,g.DecodeLatency) }
+  io.TwBus.valid := fsm.isActive(fsm.LOOP)
+//  io.TwBus.valid := Delay(fsm.isActive(fsm.LOOP),g.DecodeLatency)
 }
 
 object CtrlGenV extends App {
@@ -233,7 +239,7 @@ object CtrlGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/CtrlPath/",
     genLineComments = true
-  ).generate(new Ctrl(NttCfg2414(paraNum = 32,debug = false)))
+  ).generate(new Ctrl(NttCfg2414(paraNum = 32, debug = false)))
 }
 object SeqMuxGenV extends App {
   SpinalConfig(
