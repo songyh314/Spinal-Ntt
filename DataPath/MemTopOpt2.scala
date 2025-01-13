@@ -121,7 +121,7 @@ case class MemTopOpt2(g: NttCfg2414) extends Component {
   mem.io.memIf.zip(mem_wr_IF.toSeq).foreach { case (t1, t2) => t1 << t2 }
 }
 
-object MemTopOpt1GenV extends App {
+object MemTopOpt2GenV extends App {
   SpinalConfig(
     mode = Verilog,
     nameWhenByFile = false,
@@ -130,7 +130,7 @@ object MemTopOpt1GenV extends App {
   ).generate(new MemTopOpt2(NttCfg2414(nttPoint = 4096, paraNum = 4)))
 }
 
-object memTopOpt1Sim extends App {
+object memTopOpt2Sim extends App {
   val period = 10
   val dut = SimConfig.withXSim.withWave.compile(new MemTopOpt2(NttCfg2414(nttPoint = 64)))
   dut.doSim("test") { dut =>
@@ -186,7 +186,7 @@ object memTopOpt1Sim extends App {
   }
 }
 
-object MemTopOpt1VivadoFlow extends App {
+object MemTopOpt2VivadoFlow extends App {
   val g = NttCfg2414()
   val useIp = false
   val workspace = "./vivado_prj/Ntt/DataPath/Mem/MemTop2"

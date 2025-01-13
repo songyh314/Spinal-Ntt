@@ -189,9 +189,9 @@ object ctrlMemGenV extends App {
     .generate(new ctrlMem(NttCfg2414()))
 }
 
-object ctrlMemSim extends App {
+object ctrlMemOpt1Sim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new ctrlMem(NttCfg2414(nttPoint = 128)))
+  val dut = SimConfig.withXSim.withWave.compile(new ctrlMemOpt1(NttCfg2414(nttPoint = 128)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(1000 * period)
@@ -282,7 +282,7 @@ object TopSim extends App {
     .withXilinxDevice("xczu9eg-ffvb1156-2-i")
     .withXSimSourcesPaths(path, path)
     .withWave
-    .compile(new Top(NttCfg2414(nttPoint = 1024)))
+    .compile(new Top(NttCfg2414(nttPoint = 128,paraNum = 8)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)
@@ -327,9 +327,9 @@ object TopSim extends App {
     clockDomain.waitSampling()
     io.start #= false
     clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
-    clockDomain.waitSampling(100)
+    clockDomain.waitSampling(20)
     io.isCal #= false
-    clockDomain.waitSampling(100)
+    clockDomain.waitSampling(20)
 
     io.isOutSideRead #= true
     clockDomain.waitSampling()
