@@ -122,7 +122,7 @@ case class ctrlMemOpt1(g: NttCfg2414) extends Component {
     val NttWriteBack = Array.fill(g.paraNum)(slave Flow DataPayload(g))
   }
 
-  val ctrl = new Ctrl(g)
+  val ctrl = new CtrlOpt1(g)
 
   ctrl.io.start := io.start
   ctrl.io.isNtt := io.isNtt
@@ -189,9 +189,9 @@ object ctrlMemGenV extends App {
     .generate(new ctrlMem(NttCfg2414()))
 }
 
-object ctrlMemOpt1Sim extends App {
+object ctrlMemSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new ctrlMemOpt1(NttCfg2414(nttPoint = 128)))
+  val dut = SimConfig.withXSim.withWave.compile(new ctrlMem(NttCfg2414(nttPoint = 128)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(1000 * period)
@@ -222,7 +222,7 @@ object ctrlMemOpt1Sim extends App {
 
 object ctrlMemOpt1Sim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new ctrlMemOpt1(NttCfg2414(nttPoint = 1024)))
+  val dut = SimConfig.withXSim.withWave.compile(new ctrlMemOpt1(NttCfg2414(nttPoint = 128)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)
@@ -282,7 +282,7 @@ object TopSim extends App {
     .withXilinxDevice("xczu9eg-ffvb1156-2-i")
     .withXSimSourcesPaths(path, path)
     .withWave
-    .compile(new Top(NttCfg2414(nttPoint = 128,paraNum = 8)))
+    .compile(new Top(NttCfg2414(nttPoint = 1024,paraNum = 8)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)
@@ -321,6 +321,17 @@ object TopSim extends App {
     clockDomain.waitSampling(10)
 
     io.isNtt #= true
+    io.isCal #= true
+    clockDomain.waitSampling()
+    io.start #= true
+    clockDomain.waitSampling()
+    io.start #= false
+    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
+    clockDomain.waitSampling(20)
+    io.isCal #= false
+    clockDomain.waitSampling(20)
+
+    io.isNtt #= false
     io.isCal #= true
     clockDomain.waitSampling()
     io.start #= true

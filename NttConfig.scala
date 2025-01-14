@@ -21,6 +21,7 @@ object NttCfg {
   case class NttCfg2414(nttPoint: Int = 1024, paraNum: Int = 4, debug: Boolean = true) {
     val M = 24
     val N = 14
+    val radix = 2
     val useBramIP = false
 
     val AddSubLatencyIntt = 2 // add&sub + rescale
@@ -51,7 +52,6 @@ object NttCfg {
     }
     val width = M
     val useMulIP = true
-    val radix = 2
     val Prime = BigInt(2).pow(M) - BigInt(2).pow(N) + 1
     val HalfPrime = (Prime + 1) / 2
     val delta = M - N

@@ -1,0 +1,2 @@
+2025/1/14: opt Ctrl module to CtrlOptAddr, in which change output port "RdAddrOri" (addrMsb + idxLsb) into RdAddrOri & RdLsbOri
+Cz i found only two Addr are used in this algo, this opt can reduce output ports usage and simplify next stage cal.
