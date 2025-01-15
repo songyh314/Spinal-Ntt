@@ -282,7 +282,7 @@ object TopSim extends App {
     .withXilinxDevice("xczu9eg-ffvb1156-2-i")
     .withXSimSourcesPaths(path, path)
     .withWave
-    .compile(new Top(NttCfg2414(nttPoint = 1024,paraNum = 8)))
+    .compile(new Top(NttCfg2414(nttPoint = 1024,paraNum = 4)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)

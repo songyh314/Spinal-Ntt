@@ -1,0 +1,439 @@
+package Ntt.DataPath
+import spinal.core._
+import spinal.core.sim._
+import spinal.lib._
+import Ntt.NttCfg._
+import myRam._
+import myTools._
+import spinal.lib.eda.bench.Rtl
+import spinal.lib.eda.xilinx.VivadoFlow
+
+import scala.collection.mutable
+
+case class idxDecodeUnit(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val addrOri = in UInt (g.BankAddrWidth bits)
+    val idxOri = in UInt (g.BankIndexWidth bits)
+    val idxDec = out UInt (g.BankIndexWidth bits)
+  }
+  noIoPrefix()
+  val bankIdx = Reg(UInt(g.BankIndexWidth bits)) init U(0)
+  val sn = io.addrOri.subdivideIn(1 bits).reduceBalancedTree(_ +^ _).resize(log2Up(g.BankAddrWidth) + 1 bits)
+  val bi = io.idxOri +^ (sn(log2Up(g.radix) - 1 downto 0) ## (B"1'b0" #* (log2Up(g.paraNum)))).asUInt
+  bankIdx := bi(g.BankIndexWidth - 1 downto 0)
+  io.idxDec := bankIdx
+}
+object idxDecodeUnit {
+  def apply(addr: UInt, idx: UInt, g: NttCfg2414): UInt = {
+    val dut = new idxDecodeUnit(g)
+    dut.io.addrOri := addr
+    dut.io.idxOri := idx
+    dut.io.idxDec
+  }
+}
+
+case class idxDecode(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val addrOri = in Vec (UInt(g.BankAddrWidth bits), g.radix)
+    val idxOri = in Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val bankIdx = out Vec (UInt(g.BankIndexWidth bits), g.BI)
+  }
+  noIoPrefix()
+
+  val addrFlat = Vec(UInt(g.BankAddrWidth bits), g.BI)
+  for (i <- 0 until g.BI) {
+    addrFlat(i) := io.addrOri(i % g.radix)
+  }
+  io.bankIdx.zip((io.idxOri).zip(addrFlat)).foreach { case (port, (idx, addr)) =>
+    port := idxDecodeUnit(addr = addr, idx = idx, g = g)
+  }
+}
+object idxDecode {
+  def apply(addr: Vec[UInt], idx: Vec[UInt], g: NttCfg2414): Vec[UInt] = {
+    val dut = new idxDecode(g)
+    dut.io.addrOri := addr
+    dut.io.idxOri := idx
+    dut.io.bankIdx
+  }
+}
+object idxDecodeGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new idxDecode(NttCfg2414()))
+}
+
+case class memInMux(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val dataIn = in Vec (Bits(g.width bits), g.BI)
+    val idxIn = in Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val dataOut = out Vec (Bits(g.width bits), g.BI)
+  }
+  import io._
+  import DataPathTools._
+//  def muxDrive(num: Seq[Int], dataIn: Vec[Bits]): Vec[Bits] = {
+//    val size = num.size
+//    val ret = Vec(Bits(dataIn.head.getWidth bits), size)
+//    for (i <- 0 until num.size) {
+//      ret(i) := dataIn(num(i))
+//    }
+//    ret
+//  }
+  if (g.paraNum == 4) {
+
+    val ch0 = Mux3ch0_4p4(g.width, g.BankIndexWidth)
+    ch0.io.muxIn := muxDrive(Seq(0, 1, 4), dataIn)
+    ch0.io.sel := idxIn(0)
+    io.dataOut(0) := ch0.io.muxOut.setName("ch0")
+
+    val ch1 = Mux5ch1_5p4(g.width, g.BankIndexWidth)
+    ch1.io.muxIn := muxDrive(Seq(1, 2, 3, 5, 6), dataIn)
+    ch1.io.sel := idxIn(1)
+    io.dataOut(1) := ch1.io.muxOut.setName("ch1")
+
+    val ch2 = Mux5ch2_6p4(g.width, g.BankIndexWidth)
+    ch2.io.muxIn := muxDrive(Seq(1, 2, 4, 5, 6), dataIn)
+    ch2.io.sel := idxIn(2)
+    io.dataOut(2) := ch2.io.muxOut.setName("ch2")
+
+    val ch3 = Mux3ch3_7p4(g.width, g.BankIndexWidth)
+    ch3.io.muxIn := muxDrive(Seq(3, 6, 7), dataIn)
+    ch3.io.sel := idxIn(3)
+    io.dataOut(3) := ch3.io.muxOut.setName("ch3")
+
+    val ch4 = Mux3ch0_4p4(g.width, g.BankIndexWidth)
+    ch4.io.muxIn := muxDrive(Seq(0, 1, 4), dataIn)
+    ch4.io.sel := idxIn(4)
+    io.dataOut(4) := ch4.io.muxOut.setName("ch4")
+
+    val ch5 = Mux5ch1_5p4(g.width, g.BankIndexWidth)
+    ch5.io.muxIn := muxDrive(Seq(1, 2, 3, 5, 6), dataIn)
+    ch5.io.sel := idxIn(5)
+    io.dataOut(5) := ch5.io.muxOut.setName("ch5")
+
+    val ch6 = Mux5ch2_6p4(g.width, g.BankIndexWidth)
+    ch6.io.muxIn := muxDrive(Seq(1, 2, 4, 5, 6), dataIn)
+    ch6.io.sel := idxIn(6)
+    io.dataOut(6) := ch6.io.muxOut.setName("ch6")
+
+    val ch7 = Mux3ch3_7p4(g.width, g.BankIndexWidth)
+    ch7.io.muxIn := muxDrive(Seq(3, 6, 7), dataIn)
+    ch7.io.sel := idxIn(7)
+    io.dataOut(7) := ch7.io.muxOut.setName("ch7")
+
+  } else { null }
+
+}
+object memInMux {
+  def apply(dataIn: Vec[Bits], idx: Vec[UInt], g: NttCfg2414): Vec[Bits] = {
+    val dut = new memInMux(g)
+    dut.io.dataIn := dataIn
+    dut.io.idxIn := idx
+    dut.io.dataOut
+  }
+}
+object memInMuxGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new memInMux(NttCfg2414()))
+}
+
+case class memInArb(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val addrOri = in Vec (UInt(g.BankAddrWidth bits), g.radix)
+    val idxOri = in Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val dataOri = in Vec (Bits(g.width bits), g.BI)
+
+    val bankIdxTrans = out Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val shuffleIdxTrans = out Vec (UInt(g.BankIndexWidth bits), g.BI)
+//    val addrMem = out Vec (UInt(g.BankAddrWidth bits), g.BI)
+    val addrSel = out Vec (Bool(), g.BI)
+    val addrOri_r1 = out Vec (UInt(g.BankAddrWidth bits), g.radix)
+    val dataMem = out Vec (Bits(g.width bits), g.BI)
+  }
+
+  val bankIdx = idxDecode(addr = io.addrOri, idx = io.idxOri, g = g) // Register 1 cyc
+  val shuffleIdx = idxShuffle(dataIn = bankIdx)
+  io.dataMem := RegNext(
+    memInMux(dataIn = RegNext(io.dataOri), idx = shuffleIdx, g = g)
+  ) // Register 1 cyc, total 2 cyc in -> out
+  io.bankIdxTrans := RegNext(bankIdx) // 2cyc idxori -> bankidxtrans, assign with datamem
+  io.shuffleIdxTrans := RegNext(shuffleIdx) // 2cyc idxori -> shuffleidxtrans, assign with datamem
+  val addrMemCb = Vec(UInt(g.BankAddrWidth bits), g.BI)
+
+  val addrOriR1 = RegNext(io.addrOri)
+  io.addrSel.zip(shuffleIdx).foreach { case (t1, t2) => t1 := t2.msb } // 1 cyc earlier than dataMem
+  io.addrOri_r1 := RegNext(io.addrOri) // 1 cyc earlier than dataMem
+//  addrMemCb.zip(shuffleIdx).foreach { case (t1, t2) =>
+//    t1 := t2.lsb ? addrOriR1(1) | addrOriR1(0)
+//  }
+//  io.addrMem := RegNext(addrMemCb) // total 2 cyc addori -> addrmem, assign with datamem
+}
+object memInArbGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new memInArb(NttCfg2414()))
+}
+
+case class memWritebackArb(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val isNtt = in Bool ()
+    val dataWb = in Vec (Bits(g.width bits), g.BI) // form BFU
+    val idxWb = in Vec (UInt(g.BankIndexWidth bits), g.BI) // from memInArb
+    val addrWb = in Vec (UInt(g.BankAddrWidth bits), g.radix) // from memInArb
+
+    val dataWbMem = out Vec (Bits(g.width bits), g.BI)
+    val addrWbMem = out Vec (UInt(g.BankAddrWidth bits), g.radix) //  1 cyc earlier than data
+    val addrWbSelMem = out Vec (Bool(), g.BI) //  1 cyc earlier than data
+  }
+
+  val idxDelaySt1 =
+    Delay(io.idxWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency).addAttribute("srl_style", "srl_reg")
+  val idxDelaySt2 = Delay(idxDelaySt1, g.BfuInttDelay - g.BfuInttDelay)
+  val addrDelaySt1 =
+    Delay(io.addrWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency).addAttribute("srl_style", "srl_reg")
+  val addrDelaySt2 = Delay(addrDelaySt1, g.BfuInttDelay - g.BfuInttDelay)
+
+  val idx = io.isNtt ? idxDelaySt1 | idxDelaySt2
+  io.addrWbMem := io.isNtt ? addrDelaySt1 | addrDelaySt2
+
+  io.dataWbMem := RegNext(memInMux(dataIn = (io.dataWb), idx = idx, g = g))
+  io.addrWbSelMem.zip(idx).foreach { case (t1, t2) => t1 := t2.msb }
+}
+object memWritebackArbGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new memWritebackArb(NttCfg2414()))
+}
+
+case class memOutArb(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val dataMem = in Vec (Bits(g.width bits), g.BI)
+    val idx = in Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val dataOrder = out Vec (Bits(g.width bits), g.BI)
+  }
+  import io._
+  import DataPathTools._
+
+  if (g.paraNum == 4) {
+    val ch0 = new dataMux2p4(g.width)
+    ch0.io.muxIn := muxDrive(Seq(0, 4), dataMem)
+    ch0.io.sel := idx(0).msb
+    dataOrder(0) := ch0.io.muxOut
+
+    val ch1 = new dataMux6ch1p4(g.width)
+    ch1.io.muxIn := muxDrive(Seq(0, 1, 2, 4, 5, 6), dataMem)
+    ch1.io.sel := idx(1).asBits
+    dataOrder(1) := ch1.io.muxOut
+
+    val ch2 = new dataMux4p4(g.width)
+    ch2.io.muxIn := muxDrive(Seq(1, 2, 5, 6), dataMem)
+    ch2.io.sel := idx(2)(g.BankIndexWidth - 1 downto 1)
+    dataOrder(2) := ch2.io.muxOut
+
+    val ch3 = new dataMux4p4(g.width)
+    ch3.io.muxIn := muxDrive(Seq(1, 3, 5, 7), dataMem)
+    ch3.io.sel := idx(3)(g.BankIndexWidth - 1 downto 1)
+    dataOrder(3) := ch3.io.muxOut
+
+    val ch4 = new dataMux4p4(g.width)
+    ch4.io.muxIn := muxDrive(Seq(0, 4, 2, 6), dataMem)
+    ch4.io.sel := idx(4)(g.BankIndexWidth - 1 downto 1)
+    dataOrder(4) := ch4.io.muxOut
+
+    val ch5 = new dataMux4p4(g.width)
+    ch5.io.muxIn := muxDrive(Seq(1, 2, 5, 6), dataMem)
+    ch5.io.sel := idx(5)(g.BankIndexWidth - 1 downto 1)
+    dataOrder(5) := ch5.io.muxOut
+
+    val ch6 = new dataMux6ch6p4(g.width)
+    ch6.io.muxIn := muxDrive(Seq(1, 2, 3, 5, 6, 7), dataMem)
+    ch6.io.sel := idx(6).asBits
+    dataOrder(6) := ch6.io.muxOut
+
+    val ch7 = new dataMux2p4(g.width)
+    ch7.io.muxIn := muxDrive(Seq(3, 7), dataMem)
+    ch7.io.sel := idx(7).msb
+    dataOrder(7) := ch7.io.muxOut
+  } else { null }
+}
+object memOutArb {
+  def apply(dataIn: Vec[Bits], idx: Vec[UInt], g: NttCfg2414): Vec[Bits] = {
+    val dut = new memOutArb(g)
+    dut.io.dataMem := dataIn
+    dut.io.idx := idx
+    dut.io.dataOrder
+  }
+}
+
+object memOutArbGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new memOutArb(NttCfg2414()))
+}
+
+case class memForwardCtrl(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val ctrl = in(CtrlBus())
+    val outsideAddrOri = slave Flow Vec(UInt(g.BankAddrWidth bits), g.radix)
+    val outsideIdxOri = slave Flow Vec(UInt(g.BankIndexWidth bits), g.BI)
+    val outsideWrDataArray = slave Flow Vec(Bits(g.width bits), g.BI)
+
+    val bfuRdAddrOri = slave Flow Vec(UInt(g.BankAddrWidth bits), g.radix)
+    val bfuRdIdxOri = slave Flow Vec(UInt(g.BankIndexWidth bits), g.BI)
+    val NttWriteBack = slave Flow (Vec(Bits(g.width bits), g.BI))
+
+    val MemIfRe = out Bool ()
+    val MemIfRdAddr = out Vec (UInt(g.BankAddrWidth bits), g.BI)
+    val bankIdxTrans = out Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val MemIfWe = out Bool ()
+    val MemIfWrAddr = out Vec (UInt(g.BankAddrWidth bits), g.BI)
+    val MemIfWrData = out Vec (Bits(g.width bits), g.BI)
+  }
+
+  val memInArb = new memInArb(g)
+  val memWbArb = new memWritebackArb(g)
+
+  memInArb.io.addrOri := io.ctrl.isCal ? io.bfuRdAddrOri.payload | io.outsideAddrOri.payload
+  memInArb.io.idxOri := io.ctrl.isCal ? io.bfuRdIdxOri.payload | io.outsideIdxOri.payload
+  memInArb.io.dataOri := io.outsideWrDataArray.payload
+
+  io.bankIdxTrans := memInArb.io.bankIdxTrans
+
+  memWbArb.io.isNtt := io.ctrl.isNtt
+  memWbArb.io.dataWb := io.NttWriteBack.payload
+  memWbArb.io.addrWb := RegNext(memInArb.io.addrOri_r1)
+  memWbArb.io.idxWb := memInArb.io.shuffleIdxTrans
+
+  for (i <- 0 until g.BI) {
+    io.MemIfWrAddr(i) := RegNext(
+      io.ctrl.isCal ? (memWbArb.io
+        .addrWbSelMem(i) ? (memWbArb.io.addrWbMem(1)) | (memWbArb.io
+        .addrWbMem(1))) |
+        (memInArb.io.addrSel(i) ? (memInArb.io.addrOri_r1(1)) | (memInArb.io.addrOri_r1(0)))
+    )
+    io.MemIfRdAddr(i) := RegNext(
+      memInArb.io.addrSel(i) ? (memInArb.io.addrOri_r1(1)) | (memInArb.io.addrOri_r1(0))
+    )
+  }
+//  io.MemIfRe := Delay(
+//    ((io.ctrl.isOutSideRead && io.outsideAddrOri.valid) || (io.ctrl.isCal && io.bfuRdAddrOri.valid)),
+//    g.DecodeLatency
+//  )
+  io.MemIfRe := io.ctrl.isCal ? { Delay(io.bfuRdAddrOri.valid, g.DecodeLatency) } | {
+    io.ctrl.isOutSideRead ? Delay(io.outsideAddrOri.valid, g.DecodeLatency) | False
+  }
+  io.MemIfWe := io.ctrl.isCal ? Delay(io.NttWriteBack.valid, g.DecodeMuxRegLatency) | {
+    io.ctrl.isOutSideWrite ? Delay(io.outsideAddrOri.valid, g.DecodeLatency) | False
+  }
+
+  io.MemIfWrData := io.ctrl.isCal ? memInArb.io.dataMem | memWbArb.io.dataWbMem
+}
+object memForwardCtrlGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new memForwardCtrl(NttCfg2414()))
+}
+
+case class memBackwardCtrl(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val ctrl = in(CtrlBus())
+    val memIfRdData = slave Flow Vec(Bits(g.width bits), g.BI)
+    val idx = in Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val outsideRdDataArray = master Flow Vec(Bits(g.width bits), g.BI)
+    val nttPayload = master Flow Vec(Bits(g.width bits), g.BI)
+  }
+  val dataMux = memOutArb(dataIn = io.memIfRdData.payload, idx = io.idx, g = g)
+  io.nttPayload.payload := RegNext(dataMux)
+  io.nttPayload.valid := RegNext(io.memIfRdData.valid && io.ctrl.isCal)
+  io.outsideRdDataArray.payload := RegNext(dataMux)
+  io.outsideRdDataArray.valid := RegNext(io.memIfRdData.valid && io.ctrl.isOutSideRead)
+}
+object memBackwardCtrlGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new memBackwardCtrl(NttCfg2414()))
+}
+
+case class DataPathTop(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val ctrl = in(CtrlBus())
+
+    val outsideAddrOri = slave Flow Vec(UInt(g.BankAddrWidth bits), g.radix)
+    val outsideIdxOri = slave Flow Vec(UInt(g.BankIndexWidth bits), g.BI)
+    val outsideRdDataArray = master Flow Vec(Bits(g.width bits), g.BI)
+    val outsideWrDataArray = slave Flow Vec(Bits(g.width bits), g.BI)
+
+    val bfuRdAddrOri = slave Flow Vec(UInt(g.BankAddrWidth bits), g.radix)
+    val bfuRdIdxOri = slave Flow Vec(UInt(g.BankIndexWidth bits), g.BI)
+    val NttWriteBack = Array.fill(g.paraNum)(slave Flow DataPayload(g))
+    val NttPayload = Array.fill(g.paraNum)(master Flow BfuPayload(g))
+    val twBus = slave Flow twPayload(addrWidth = g.twAddrWidth, muxWidth = log2Up(g.paraNum), para = g.paraNum)
+  }
+
+  val mem = new memBank(g)
+  val mem_rd_IF = Array.fill(g.BI)(new myRamReadOnly(config = myRamConfig(g.width, g.BankAddrWidth)))
+  val mem_wr_IF = Array.fill(g.BI)(new myRamWriteOnly(config = myRamConfig(g.width, g.BankAddrWidth)))
+
+  val tw = new Area {
+    val rom = new twRom(g)
+    rom.io.twBus := Delay(io.twBus, (g.DecodeLatency + g.DatDeMuxLatency)).addAttribute("srl_style", "srl_reg")
+  }
+
+  val fc = memForwardCtrl(g)
+  val bc = memBackwardCtrl(g)
+  fc.io.ctrl := io.ctrl
+  fc.io.outsideAddrOri := io.outsideAddrOri
+  fc.io.outsideIdxOri := io.outsideIdxOri
+  fc.io.outsideWrDataArray := io.outsideWrDataArray
+  fc.io.bfuRdAddrOri := io.bfuRdAddrOri
+  fc.io.bfuRdIdxOri := io.bfuRdIdxOri
+  val NttWbConvert = Vec(io.NttWriteBack.flatMap { item => Seq(item.payload.A.asBits, item.payload.B.asBits) }.toSeq)
+  fc.io.NttWriteBack.payload := NttWbConvert
+  fc.io.NttWriteBack.valid := io.NttWriteBack(0).valid
+
+  mem_rd_IF.toSeq.zip(fc.io.MemIfRdAddr).foreach { case (t1, t2) => { t1.rAddr := t2; t1.re := fc.io.MemIfRe } }
+  bc.io.memIfRdData.payload.zip(mem_rd_IF.toSeq).foreach { case (t1, t2) => t1 := t2.rData }
+  mem_wr_IF.toSeq.zip(fc.io.MemIfWrAddr.zip(fc.io.MemIfWrData)).foreach { case (interface, (addr, data)) =>
+    interface.wData := data; interface.wAddr := addr; interface.we := fc.io.MemIfWe
+  }
+
+  bc.io.memIfRdData.valid := Delay(fc.io.MemIfRe, g.ramLatency)
+  val idxTrans = Delay(fc.io.bankIdxTrans, g.ramLatency)
+  bc.io.ctrl := io.ctrl
+  bc.io.idx := idxTrans
+  io.outsideRdDataArray := bc.io.outsideRdDataArray
+  io.NttPayload.toSeq.zip(bc.io.nttPayload.payload.grouped(2).toSeq).foreach { case (t1, t2) =>
+    t1.A := t2(0).asUInt; t1.B := t2(1).asUInt
+    t1.valid := bc.io.nttPayload.valid
+  }
+  io.NttPayload.toSeq.zip(tw.rom.io.twData).foreach { case (t1, t2) => t1.payload.Tw := t2 }
+
+}

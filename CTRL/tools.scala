@@ -125,3 +125,4 @@ object SeqMuxVivadoFlow extends App {
   val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
   println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea}")
 }
+

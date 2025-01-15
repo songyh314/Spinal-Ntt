@@ -100,34 +100,7 @@ object idxMux {
     uidxMux
   }
 }
-case class idxShuffle(idxWidth: Int, n: Int) extends Component {
-  val io = new Bundle {
-    val bankIdx = in Vec (UInt(idxWidth bits), n)
-    val shuffleIdx = out Vec (UInt(idxWidth bits), n)
-  }
-  noIoPrefix()
-  val base = Vec(UInt(idxWidth * n bits), n)
-  base := Vec((0 until n).map(U(_).resized))
-  val ret = Vec(
-    base
-      .zip(io.bankIdx)
-      .map { p => p._1 |<< (p._2 * idxWidth) }
-      .map(_.asBits)
-      .reduceBalancedTree(_ | _)
-      .subdivideIn(n slices)
-      .map(_.asUInt)
-  )
-  io.shuffleIdx := ret
-}
-object idxShuffle {
-  def apply(dataIn: Vec[UInt]): Vec[UInt] = {
-    val width = dataIn.head.getWidth
-    val n = dataIn.size
-    val dut = new idxShuffle(width, n)
-    dut.io.bankIdx := dataIn
-    dut.io.shuffleIdx
-  }
-}
+
 
 case class writebackMux(g: NttCfg2414) extends Component {
   val io = new Bundle {

@@ -251,7 +251,14 @@ object NttCfg {
 //  case class NttCtrl(g:NttCfg2414) extends Bundle{
 //    val isNtt
 //  }
-  class CtrlBus extends Bundle {
+//
+//  class NttCtrl extends Bundle {
+//    val isNtt = Bool()
+//    val isOutSideRead = Bool()
+//    val isOutSideWrite = Bool()
+//    val isCal = Bool()
+//  }
+  case class CtrlBus() extends Bundle {
     val isNtt = Bool()
     val isCal = Bool()
     val isOutSideRead = Bool()

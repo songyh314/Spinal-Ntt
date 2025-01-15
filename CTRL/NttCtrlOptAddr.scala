@@ -167,7 +167,7 @@ object CtrlOptAddrGenV extends App {
     mode = Verilog,
     nameWhenByFile = false,
     anonymSignalPrefix = "tmp",
-    targetDirectory = "NttOpt/rtl/",
+    targetDirectory = "NttOpt/rtl/Ctrl",
     genLineComments = true
   ).generate(new CtrlOptAddr(NttCfg2414(paraNum = 32, debug = false)))
 }
@@ -210,7 +210,7 @@ object CtrlOptAddrVivadoFlow extends App {
   val cpu = 16
   val rtl = new Rtl {
     override def getName(): String = "CtrlOptAddr"
-    override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/CtrlOptAddr.v"
+    override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/Ctrl/CtrlOptAddr.v"
   }
   val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
   println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea}")
