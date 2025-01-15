@@ -169,7 +169,7 @@ case class memInArb(g: NttCfg2414) extends Component {
   val addrMemCb = Vec(UInt(g.BankAddrWidth bits), g.BI)
 
   val addrOriR1 = RegNext(io.addrOri)
-  io.addrSel.zip(shuffleIdx).foreach { case (t1, t2) => t1 := t2.msb } // 1 cyc earlier than dataMem
+  io.addrSel.zip(shuffleIdx).foreach { case (t1, t2) => t1 := t2.lsb } // 1 cyc earlier than dataMem
   io.addrOri_r1 := RegNext(io.addrOri) // 1 cyc earlier than dataMem
 //  addrMemCb.zip(shuffleIdx).foreach { case (t1, t2) =>
 //    t1 := t2.lsb ? addrOriR1(1) | addrOriR1(0)
@@ -209,7 +209,7 @@ case class memWritebackArb(g: NttCfg2414) extends Component {
   io.addrWbMem := io.isNtt ? addrDelaySt1 | addrDelaySt2
 
   io.dataWbMem := RegNext(memInMux(dataIn = (io.dataWb), idx = idx, g = g))
-  io.addrWbSelMem.zip(idx).foreach { case (t1, t2) => t1 := t2.msb }
+  io.addrWbSelMem.zip(idx).foreach { case (t1, t2) => t1 := t2.lsb }
 }
 object memWritebackArbGenV extends App {
   SpinalConfig(
@@ -252,7 +252,7 @@ case class memOutArb(g: NttCfg2414) extends Component {
     dataOrder(3) := ch3.io.muxOut
 
     val ch4 = new dataMux4p4(g.width)
-    ch4.io.muxIn := muxDrive(Seq(0, 4, 2, 6), dataMem)
+    ch4.io.muxIn := muxDrive(Seq(0, 2, 4, 6), dataMem)
     ch4.io.sel := idx(4)(g.BankIndexWidth - 1 downto 1)
     dataOrder(4) := ch4.io.muxOut
 
@@ -346,7 +346,7 @@ case class memForwardCtrl(g: NttCfg2414) extends Component {
     io.ctrl.isOutSideWrite ? Delay(io.outsideAddrOri.valid, g.DecodeLatency) | False
   }
 
-  io.MemIfWrData := io.ctrl.isCal ? memInArb.io.dataMem | memWbArb.io.dataWbMem
+  io.MemIfWrData := io.ctrl.isCal ? memWbArb.io.dataWbMem | memInArb.io.dataMem
 }
 object memForwardCtrlGenV extends App {
   SpinalConfig(
@@ -435,5 +435,53 @@ case class DataPathTop(g: NttCfg2414) extends Component {
     t1.valid := bc.io.nttPayload.valid
   }
   io.NttPayload.toSeq.zip(tw.rom.io.twData).foreach { case (t1, t2) => t1.payload.Tw := t2 }
+  mem.io.memIf.zip(mem_rd_IF.toSeq).foreach { case (t1, t2) => t1 << t2 }
+  mem.io.memIf.zip(mem_wr_IF.toSeq).foreach { case (t1, t2) => t1 << t2 }
+}
+object DataPathTopGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new DataPathTop(NttCfg2414()))
+}
+object DataPathTopVivadoFlow extends App {
+  val g = NttCfg2414()
+  val useIp = false
+  val workspace = "NttOpt/fpga/DataPathTop"
+  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
+//  val family = "Zynq UltraScale+ MPSoCS"
+//  val device = "xczu9eg-ffvb1156-2-i"
+    val family = "Virtex 7"
+    val device = "xc7vx485tffg1157-1"
+  val frequency = 300 MHz
+  val cpu = 16
+  val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mem.xcix"
+  val paths = Seq(
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/DataPathTop.v",
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/DataPathTop.v_toplevel_tw_rom_rom.bin",
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/bram.v"
+  )
+  if (g.useBramIP) {
+    val rtl = new Rtl {
+
+      /** Name */
+      override def getName(): String = "DataPathTop"
+      override def getRtlPaths(): Seq[String] = paths
+    }
+    val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu, xcix = xcix)
+    println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
+  } else {
+    val rtl = new Rtl {
+
+      /** Name */
+      override def getName(): String = "DataPathTop"
+      override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/DataPathTop.v"
+    }
+    val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
+    println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
+  }
 
 }
