@@ -70,8 +70,8 @@ case class FastMod2414(g: NttCfg2414) extends Component {
     io.dataIn.payload(2 * g.width - 1 downto i * g.delta + g.width)
   })
   val A = RegNextWhen(aPart.reduce(_ +^ _), io.dataIn.valid) init U(0)
-  val B_1 = RegNextWhen(bPart(0), io.dataIn.valid) init U(0)
-  val B_2 = RegNextWhen(bPart(1) +^ bPart(2), io.dataIn.valid) init U(0)
+  val B_1 = RegNextWhen(bPart(2), io.dataIn.valid) init U(0)
+  val B_2 = RegNextWhen(bPart(1) +^ bPart(0), io.dataIn.valid) init U(0)
   val B = RegNext(B_1 +^ B_2)
   val C = RegNextWhen(io.dataIn.payload(g.width - 1 downto 0), io.dataIn.valid)
   val Aslice = A._data.resize(2 * g.delta).subdivideIn(2 slices)
@@ -87,9 +87,9 @@ case class FastMod2414(g: NttCfg2414) extends Component {
   val Res2_tmp1 = Res1 - B
   val Res2_tmp2 = (Res1 +^ g.Prime) - B
   val Res2_value = (Res1 >= B) ? Res2_tmp1 | Res2_tmp2
-  val Res2 = RegNext(Res2_value)
+  val Res2 = RegNext(Res2_value.resize(g.width bits))
   val valid = Delay(io.dataIn.valid, LatencyAnalysis(io.dataIn.payload, Res2))
-  io.dataOut.payload := Res2.resized
+  io.dataOut.payload := Res2
   io.dataOut.valid := valid
 }
 
