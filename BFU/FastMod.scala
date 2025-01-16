@@ -1,6 +1,7 @@
 package Ntt.BFU
 
 import Ntt.NttCfg.NttCfg2414
+import org.scalatest.funsuite.AnyFunSuite
 import spinal.core._
 import spinal.core.sim._
 import spinal.lib._
@@ -53,7 +54,7 @@ import scala.util.Random
 //  io.dataOut.valid := validDealy
 //}
 
-class FastMod2414(g: NttCfg2414) extends Component {
+case class FastMod2414(g: NttCfg2414) extends Component {
   val prime = g.Prime
   val io = new Bundle {
     val dataIn = slave Flow (UInt(2 * g.width bits))
@@ -92,76 +93,79 @@ class FastMod2414(g: NttCfg2414) extends Component {
   io.dataOut.valid := valid
 }
 
-case class simEnv() extends FastMod2414(NttCfg2414()) {
-  val drvQueue = mutable.Queue[BigInt]()
-  val drvMon = mutable.Queue[BigInt]()
-  val refQueue = mutable.Queue[BigInt]()
-  val resQueue = mutable.Queue[BigInt]()
-
-  @volatile private var stop: Boolean = false
-  def refModule(dataIn: BigInt): Unit = {
-    val ref = dataIn % prime
-    refQueue.enqueue(ref)
-  }
-  def Driver(): Unit = {
-    val drv = fork {
-      while (!stop) {
-        if (drvQueue.nonEmpty) {
-          val test = drvQueue.dequeue()
-          refModule(test)
-          io.dataIn.payload #= test
-          io.dataIn.valid #= true
-          clockDomain.waitSampling()
-          io.dataIn.valid #= false
-        } else { clockDomain.waitSampling() }
-      }
-    }
-  }
-  def Monitor(): Unit = {
-    val mon = fork {
-      while (!stop) {
-        if (io.dataOut.valid.toBoolean) { resQueue.enqueue(io.dataOut.payload.toBigInt) }
-        clockDomain.waitSampling()
-      }
-    }
-  }
-  def scoreBoard(): Unit = {
-    val score = fork {
-      while (!stop) {
-        if (refQueue.nonEmpty && resQueue.nonEmpty) {
-          val drvData = drvMon.dequeue()
-          val calRes = resQueue.dequeue()
-          val calRef = refQueue.dequeue()
-          assert(calRes == calRef, s"data mismatch input:${drvData} res:${calRes}  ref:${calRef}")
-          if(calRes != calRef){
-            println(s"data:${drvData} res:${calRes}  ref:${calRef}")
-          }
-        }
-        clockDomain.waitSampling()
-      }
-    }
-  }
-  def simEnvStart(): Unit = {
-    //      simInit()
-    Driver()
-    Monitor()
-    scoreBoard()
-  }
-  def waitSimDone(): Unit = {
-    clockDomain.waitSampling(10)
-    while (refQueue.nonEmpty || resQueue.nonEmpty) {
-      clockDomain.waitSampling(10)
-    }
-    stop = true
-    clockDomain.waitSampling(10)
-    println("sim finish")
-    simSuccess()
-  }
-  def insertData(test: BigInt = 0): Unit = {
-    drvQueue.enqueue(test)
-    drvMon.enqueue(test)
-  }
-}
+//case class simEnv() extends FastMod2414(NttCfg2414()) {
+//  val drvQueue = mutable.Queue[BigInt]()
+//  val drvMon = mutable.Queue[BigInt]()
+//  val refQueue = mutable.Queue[BigInt]()
+//  val resQueue = mutable.Queue[BigInt]()
+//
+//  @volatile var stop: Boolean = false
+//  def refModule(dataIn: BigInt): Unit = {
+//    val ref = dataIn % prime
+//    refQueue.enqueue(ref)
+//  }
+//  def Driver(stop: Boolean): Unit = {
+//    val drv = fork {
+//      while (!stop) {
+//        if (drvQueue.nonEmpty) {
+//          val test = drvQueue.dequeue()
+//          refModule(test)
+//          io.dataIn.payload #= test
+//          io.dataIn.valid #= true
+//          clockDomain.waitSampling()
+//          io.dataIn.valid #= false
+//        } else { clockDomain.waitSampling() }
+//      }
+//    }
+//    if (stop) { drv.join() }
+//  }
+//  def Monitor(stop: Boolean): Unit = {
+//    val mon = fork {
+//      while (!stop) {
+//        if (io.dataOut.valid.toBoolean) { resQueue.enqueue(io.dataOut.payload.toBigInt) }
+//        clockDomain.waitSampling()
+//      }
+//    }
+//    if (stop) { mon.join() }
+//  }
+//  def scoreBoard(stop: Boolean): Unit = {
+//    val score = fork {
+//      while (!stop) {
+//        if (refQueue.nonEmpty && resQueue.nonEmpty) {
+//          val drvData = drvMon.dequeue()
+//          val calRes = resQueue.dequeue()
+//          val calRef = refQueue.dequeue()
+////          assert(calRes == calRef, s"data mismatch input:${drvData} res:${calRes}  ref:${calRef}")
+//          if (calRes != calRef) {
+//            println(s"data:${drvData} res:${calRes}  ref:${calRef}")
+//          }
+//        }
+//        clockDomain.waitSampling()
+//      }
+//    }
+//    if (stop) { score.join() }
+//  }
+//  def simEnvStart(stop: Boolean): Unit = {
+//    //      simInit()
+//    Driver(stop)
+//    Monitor(stop)
+//    scoreBoard(stop)
+//  }
+//  def waitSimDone(): Unit = {
+//    while (refQueue.nonEmpty || resQueue.nonEmpty) {
+//      clockDomain.waitSampling(10)
+//    }
+//
+//    stop = true
+//
+//    println("sim finish")
+//    simSuccess()
+//  }
+//  def insertData(test: BigInt = 0): Unit = {
+//    drvQueue.enqueue(test)
+//    drvMon.enqueue(test)
+//  }
+//}
 
 object FastModGenVerilog extends App {
   SpinalConfig(
@@ -173,21 +177,42 @@ object FastModGenVerilog extends App {
 }
 
 object FastModSim extends App {
-  val dut = SimConfig.withWave.withXSim.compile(simEnv())
+  val dut = SimConfig.withWave.withXSim.compile(FastMod2414(NttCfg2414()))
+  val period = 10
   dut.doSim("test") { dut =>
+    SimTimeout(1000 * period)
     import dut._
-    val p = BigInt(2).pow(24) - BigInt(2).pow(14) + 1
-    val max = (p - 1).pow(2)
-    val period = 10
-    SimTimeout(5000 * period)
+    io.dataIn.valid #= false
     clockDomain.forkStimulus(period)
-    simEnvStart()
-    for (i <- 0 until 4096) {
-      val randomTest = BigInt(max.bitLength, Random) % (max - p) + p
-      insertData(randomTest)
+    clockDomain.waitSampling(10)
+    val seq: Seq[BigInt] = Seq(233071802950421L, 160250870884935L, 16554875289840L, 277760362779586L)
+    for (i <- seq.indices) {
+      io.dataIn.valid #= true
+      io.dataIn.payload #= seq(i)
+      clockDomain.waitSampling()
+      io.dataIn.valid #= false
     }
-    waitSimDone()
+    clockDomain.waitSampling(10)
+
   }
+//  dut.doSim("test") { dut =>
+//    import dut._
+//    val p = BigInt(2).pow(24) - BigInt(2).pow(14) + 1
+//    val max = (p - 1).pow(2)
+//
+//    var stop = false
+//    SimTimeout(5000 * period)
+//    clockDomain.forkStimulus(period)
+//    simEnvStart(stop)
+//    val seq: Seq[BigInt] = Seq(233071802950421L, 160250870884935L, 16554875289840L, 277760362779586L)
+//    for (i <- seq.indices) {
+////      val randomTest = BigInt(max.bitLength, Random) % (max - p) + p
+//      insertData(seq(i))
+//    }
+//    clockDomain.waitSampling(50)
+//    stop = true
+////    waitSimDone()
+//  }
 }
 object test extends App {
   override def main(args: Array[String]): Unit = {

@@ -199,10 +199,10 @@ case class memWritebackArb(g: NttCfg2414) extends Component {
   }
 
   val idxDelaySt1 =
-    Delay(io.idxWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency).addAttribute("srl_style", "srl_reg")
+    Delay(io.idxWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay).addAttribute("srl_style", "srl_reg")
   val idxDelaySt2 = Delay(idxDelaySt1, g.BfuInttDelay - g.BfuInttDelay)
   val addrDelaySt1 =
-    Delay(io.addrWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency).addAttribute("srl_style", "srl_reg")
+    Delay(io.addrWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay).addAttribute("srl_style", "srl_reg")
   val addrDelaySt2 = Delay(addrDelaySt1, g.BfuInttDelay - g.BfuInttDelay)
 
   val idx = io.isNtt ? idxDelaySt1 | idxDelaySt2
@@ -327,18 +327,14 @@ case class memForwardCtrl(g: NttCfg2414) extends Component {
   for (i <- 0 until g.BI) {
     io.MemIfWrAddr(i) := RegNext(
       io.ctrl.isCal ? (memWbArb.io
-        .addrWbSelMem(i) ? (memWbArb.io.addrWbMem(1)) | (memWbArb.io
-        .addrWbMem(1))) |
+        .addrWbSelMem(i) ? (memWbArb.io.addrWbMem(1)) | (memWbArb.io.addrWbMem(0))) |
         (memInArb.io.addrSel(i) ? (memInArb.io.addrOri_r1(1)) | (memInArb.io.addrOri_r1(0)))
     )
     io.MemIfRdAddr(i) := RegNext(
       memInArb.io.addrSel(i) ? (memInArb.io.addrOri_r1(1)) | (memInArb.io.addrOri_r1(0))
     )
   }
-//  io.MemIfRe := Delay(
-//    ((io.ctrl.isOutSideRead && io.outsideAddrOri.valid) || (io.ctrl.isCal && io.bfuRdAddrOri.valid)),
-//    g.DecodeLatency
-//  )
+
   io.MemIfRe := io.ctrl.isCal ? { Delay(io.bfuRdAddrOri.valid, g.DecodeLatency) } | {
     io.ctrl.isOutSideRead ? Delay(io.outsideAddrOri.valid, g.DecodeLatency) | False
   }
@@ -452,10 +448,10 @@ object DataPathTopVivadoFlow extends App {
   val useIp = false
   val workspace = "NttOpt/fpga/DataPathTop"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
-//  val family = "Zynq UltraScale+ MPSoCS"
-//  val device = "xczu9eg-ffvb1156-2-i"
-    val family = "Virtex 7"
-    val device = "xc7vx485tffg1157-1"
+  val family = "Zynq UltraScale+ MPSoCS"
+  val device = "xczu9eg-ffvb1156-2-i"
+//    val family = "Virtex 7"
+//    val device = "xc7vx485tffg1157-1"
   val frequency = 300 MHz
   val cpu = 16
   val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mem.xcix"

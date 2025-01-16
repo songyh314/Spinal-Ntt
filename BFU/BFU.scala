@@ -11,13 +11,28 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
+case class invTwConvert(g:NttCfg2414) extends Component{
+  val io = new Bundle{
+    val tw = in UInt(g.width bits)
+    val invTw = out UInt(g.width bits)
+  }
+  val tmp = g.Prime - io.tw
+  io.invTw := RegNext(tmp)
+}
+
 class Bfu(g: NttCfg2414, debug: Boolean = false) extends Component {
   val io = new Bundle {
     val isNtt = in Bool ()
     val dataIn = slave Flow (BfuPayload(g))
     val dataOut = master Flow (DataPayload(g))
   }
+
+  def genInvTw(tw:UInt):UInt = {
+    val ret = RegNext(g.Prime - tw)
+    ret
+  }
   import io._
+
   val debugArea = if (debug) {
     new Area {
       dataOut.A := io.isNtt ? Delay(io.dataIn.payload.A, g.BfuNttDelay) | Delay(io.dataIn.payload.A, g.BfuInttDelay)
@@ -28,9 +43,11 @@ class Bfu(g: NttCfg2414, debug: Boolean = false) extends Component {
 
   val funcArea = if (!debug) {
     new Area {
+
       val uAddSub = new AddSub(g)
       val uModMult = new ModMult(g)
-      val DelayOutSt1 = Delay(io.dataIn.Tw, g.BfuLatencySt1).addAttribute("SRL_STYLE", "SRL_REG")
+      val invTw = genInvTw(io.dataIn.payload.Tw)
+      val DelayOutSt1 = Delay(invTw, g.BfuLatencySt1 - 1).addAttribute("SRL_STYLE", "SRL_REG")
       val DelayOutSt2 =
         Delay(io.isNtt ? io.dataIn.A | uAddSub.io.dataOut.A, g.BfuLatencySt2).addAttribute("SRL_STYLE", "SRL_REG")
 
