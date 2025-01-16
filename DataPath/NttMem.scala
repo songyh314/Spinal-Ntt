@@ -74,6 +74,7 @@ case class twRom(g: NttCfg2414) extends Component {
   }
   val tw = g.twCompress.map(B(_,g.twWidth bits))
   val tw128 = g.twCompress128.map(B(_,g.twWidth bits))
+  val tw256 = g.twCompress256.map(B(_,g.twWidth bits))
 //  val rom = Mem(Bits(g.twWidth bits),g.nttPoint/g.paraNum)
   val rom = Mem(Bits(g.twWidth bits), initialContent = tw)
   val muxReg = RegNextWhen(io.twBus.payload.twMux, io.twBus.valid)

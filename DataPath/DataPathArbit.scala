@@ -199,11 +199,11 @@ case class memWritebackArb(g: NttCfg2414) extends Component {
   }
 
   val idxDelaySt1 =
-    Delay(io.idxWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay).addAttribute("srl_style", "srl_reg")
-  val idxDelaySt2 = Delay(idxDelaySt1, g.BfuInttDelay - g.BfuInttDelay)
+    Delay(io.idxWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay).addAttribute("srl_style", "srl")
+  val idxDelaySt2 = Delay(idxDelaySt1, g.BfuInttDelay - g.BfuNttDelay)
   val addrDelaySt1 =
-    Delay(io.addrWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay).addAttribute("srl_style", "srl_reg")
-  val addrDelaySt2 = Delay(addrDelaySt1, g.BfuInttDelay - g.BfuInttDelay)
+    Delay(io.addrWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay).addAttribute("srl_style", "srl")
+  val addrDelaySt2 = Delay(addrDelaySt1, g.BfuInttDelay - g.BfuNttDelay)
 
   val idx = io.isNtt ? idxDelaySt1 | idxDelaySt2
   io.addrWbMem := io.isNtt ? addrDelaySt1 | addrDelaySt2
@@ -400,7 +400,7 @@ case class DataPathTop(g: NttCfg2414) extends Component {
 
   val tw = new Area {
     val rom = new twRom(g)
-    rom.io.twBus := Delay(io.twBus, (g.DecodeLatency + g.DatDeMuxLatency)).addAttribute("srl_style", "srl_reg")
+    rom.io.twBus := Delay(io.twBus, (g.DecodeLatency + g.DatDeMuxLatency)).addAttribute("srl_style", "srl")
   }
 
   val fc = memForwardCtrl(g)

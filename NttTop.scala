@@ -100,7 +100,7 @@ object NttTopSim extends App {
     .workspacePath("./NttOpt/sim/")
     .withXSimSourcesPaths(path, path)
     .withWave
-    .compile(new NttTop(NttCfg2414(paraNum = 4), debug = false))
+    .compile(new NttTop(NttCfg2414(nttPoint = 256,paraNum = 4), debug = false))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)
@@ -199,24 +199,78 @@ object NttTopSim extends App {
     clockDomain.waitSampling(20)
     io.ctrl.isCal #= false
     clockDomain.waitSampling(20)
+
     if (dut.io.idle.toBoolean) {
       flag = false
     }
     recIn.join()
     recOut.join()
+    clockDomain.waitSampling(10)
 
-//    io.ctrl.isNtt #= false
-//    io.ctrl.isCal #= true
-//    clockDomain.waitSampling()
-//    io.start #= true
-//    clockDomain.waitSampling()
-//    io.start #= false
-//    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
-//    clockDomain.waitSampling(20)
-//    io.ctrl.isCal #= false
-//    clockDomain.waitSampling(20)
+    @volatile var flag_intt = true
+    val recinttIn = fork {
+      val p = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/intt_in.txt")
+      while (flag_intt) {
+        if (io.bfuIn(0).valid.toBoolean) {
+          val seq0 =
+            (io.bfuIn(0).payload.A.toLong, io.bfuIn(0).payload.B.toLong, (g.Prime - io.bfuIn(0).payload.Tw.toLong))
+          //          println(seq0)
+          val seq1 =
+            (io.bfuIn(1).payload.A.toLong, io.bfuIn(1).payload.B.toLong, (g.Prime - io.bfuIn(1).payload.Tw.toLong))
+          //          println(seq1)
+          val seq2 =
+            (io.bfuIn(2).payload.A.toLong, io.bfuIn(2).payload.B.toLong, (g.Prime - io.bfuIn(2).payload.Tw.toLong))
+          //          println(seq2)
+          val seq3 =
+            (io.bfuIn(3).payload.A.toLong, io.bfuIn(3).payload.B.toLong, (g.Prime - io.bfuIn(3).payload.Tw.toLong))
+          //          println(seq3)
+          p.println(f"$seq0")
+          p.println(f"$seq1")
+          p.println(f"$seq2")
+          p.println(f"$seq3")
+          clockDomain.waitSampling()
+        } else { clockDomain.waitSampling() }
+      }
+      p.close()
+    }
+    val recinttOut = fork {
+      val p = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/intt_out.txt")
+      while (flag_intt) {
+        if (io.bfuOut(0).valid.toBoolean) {
+          val seq0 = (io.bfuOut(0).payload.A.toLong, io.bfuOut(0).payload.B.toLong)
+          //          println(seq0)
+          val seq1 = (io.bfuOut(1).payload.A.toLong, io.bfuOut(1).payload.B.toLong)
+          //          println(seq1)
+          val seq2 = (io.bfuOut(2).payload.A.toLong, io.bfuOut(2).payload.B.toLong)
+          //          println(seq2)
+          val seq3 = (io.bfuOut(3).payload.A.toLong, io.bfuOut(3).payload.B.toLong)
+          //          println(seq3)
+          p.println(f"$seq0")
+          p.println(f"$seq1")
+          p.println(f"$seq2")
+          p.println(f"$seq3")
+          clockDomain.waitSampling()
+        } else { clockDomain.waitSampling() }
+      }
+      p.close()
+    }
 
-//    m.join()
+    io.ctrl.isNtt #= false
+    io.ctrl.isCal #= true
+    clockDomain.waitSampling()
+    io.start #= true
+    clockDomain.waitSampling()
+    io.start #= false
+    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
+    clockDomain.waitSampling(20)
+    io.ctrl.isCal #= false
+    clockDomain.waitSampling(20)
+    if (dut.io.idle.toBoolean) {
+      flag_intt = false
+    }
+    recinttIn.join()
+    recinttOut.join()
+    clockDomain.waitSampling(10)
 
     io.ctrl.isOutSideRead #= true
     clockDomain.waitSampling()
