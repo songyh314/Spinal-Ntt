@@ -161,20 +161,14 @@ case class memInArb(g: NttCfg2414) extends Component {
 
   val bankIdx = idxDecode(addr = io.addrOri, idx = io.idxOri, g = g) // Register 1 cyc
   val shuffleIdx = idxShuffle(dataIn = bankIdx)
-  io.dataMem := RegNext(
-    memInMux(dataIn = RegNext(io.dataOri), idx = shuffleIdx, g = g)
-  ) // Register 1 cyc, total 2 cyc in -> out
+//  io.dataMem := RegNext(memInMux(dataIn = RegNext(io.dataOri), idx = shuffleIdx, g = g)) // Register 1 cyc, total 2 cyc in -> out
+  io.dataMem := (memInMux(dataIn = RegNext(io.dataOri), idx = shuffleIdx, g = g))
   io.bankIdxTrans := RegNext(bankIdx) // 2cyc idxori -> bankidxtrans, assign with datamem
   io.shuffleIdxTrans := RegNext(shuffleIdx) // 2cyc idxori -> shuffleidxtrans, assign with datamem
-  val addrMemCb = Vec(UInt(g.BankAddrWidth bits), g.BI)
 
-  val addrOriR1 = RegNext(io.addrOri)
   io.addrSel.zip(shuffleIdx).foreach { case (t1, t2) => t1 := t2.lsb } // 1 cyc earlier than dataMem
   io.addrOri_r1 := RegNext(io.addrOri) // 1 cyc earlier than dataMem
-//  addrMemCb.zip(shuffleIdx).foreach { case (t1, t2) =>
-//    t1 := t2.lsb ? addrOriR1(1) | addrOriR1(0)
-//  }
-//  io.addrMem := RegNext(addrMemCb) // total 2 cyc addori -> addrmem, assign with datamem
+
 }
 object memInArbGenV extends App {
   SpinalConfig(
@@ -199,16 +193,19 @@ case class memWritebackArb(g: NttCfg2414) extends Component {
   }
 
   val idxDelaySt1 =
-    Delay(io.idxWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay).addAttribute("srl_style", "srl")
+    Delay(io.idxWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay)
+      .addAttribute("srl_style", "srl")
   val idxDelaySt2 = Delay(idxDelaySt1, g.BfuInttDelay - g.BfuNttDelay)
   val addrDelaySt1 =
-    Delay(io.addrWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay).addAttribute("srl_style", "srl")
+    Delay(io.addrWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay)
+      .addAttribute("srl_style", "srl")
   val addrDelaySt2 = Delay(addrDelaySt1, g.BfuInttDelay - g.BfuNttDelay)
 
   val idx = io.isNtt ? idxDelaySt1 | idxDelaySt2
   io.addrWbMem := io.isNtt ? addrDelaySt1 | addrDelaySt2
 
-  io.dataWbMem := RegNext(memInMux(dataIn = (io.dataWb), idx = idx, g = g))
+  io.dataWbMem := (memInMux(dataIn = (io.dataWb), idx = idx, g = g))
+//  io.dataWbMem := RegNext(memInMux(dataIn = (io.dataWb), idx = idx, g = g))
   io.addrWbSelMem.zip(idx).foreach { case (t1, t2) => t1 := t2.lsb }
 }
 object memWritebackArbGenV extends App {
@@ -342,7 +339,7 @@ case class memForwardCtrl(g: NttCfg2414) extends Component {
     io.ctrl.isOutSideWrite ? Delay(io.outsideAddrOri.valid, g.DecodeLatency) | False
   }
 
-  io.MemIfWrData := io.ctrl.isCal ? memWbArb.io.dataWbMem | memInArb.io.dataMem
+  io.MemIfWrData := RegNext(io.ctrl.isCal ? memWbArb.io.dataWbMem | memInArb.io.dataMem)
 }
 object memForwardCtrlGenV extends App {
   SpinalConfig(

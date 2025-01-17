@@ -100,7 +100,7 @@ object NttTopSim extends App {
     .workspacePath("./NttOpt/sim/")
     .withXSimSourcesPaths(path, path)
     .withWave
-    .compile(new NttTop(NttCfg2414(nttPoint = 256,paraNum = 4), debug = false))
+    .compile(new NttTop(NttCfg2414(nttPoint = 1024,paraNum = 4), debug = false))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)

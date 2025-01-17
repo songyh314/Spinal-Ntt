@@ -24,10 +24,10 @@ object NttCfg {
     val radix = 2
     val useBramIP = false
     val nttSimPublic = true
-    val AddSubLatencyIntt = 2 // add&sub + rescale
-    val AddSubLatencyNtt = 1 // add&sub
+    val AddSubLatencyIntt = 3 // add&sub + rescale
+    val AddSubLatencyNtt = 2 // add&sub
     val MultLatency = 4
-    val FastModLatency = 3
+    val FastModLatency = 4
     val BfuLatencySt1 = AddSubLatencyIntt
     val BfuLatencySt2 = MultLatency + FastModLatency
     val BfuNttDelay = AddSubLatencyNtt + MultLatency + FastModLatency
