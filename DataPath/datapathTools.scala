@@ -6,11 +6,12 @@ import spinal.lib._
 import Ntt.NttCfg._
 import myRam._
 import myTools._
+import spinal.sim.DataType
 
 object DataPathTools {
-  def muxDrive(num: Seq[Int], dataIn: Vec[Bits]): Vec[Bits] = {
+  def muxDrive[T <: Data]( num: Seq[Int], dataIn: Vec[T]): Vec[T] = {
     val size = num.size
-    val ret = Vec(Bits(dataIn.head.getWidth bits), size)
+    val ret = Vec(cloneOf(dataIn.head), size)
     for (i <- 0 until num.size) {
       ret(i) := dataIn(num(i))
     }

@@ -165,7 +165,7 @@ case class ctrlpath_datapath_union(g:NttCfg2414) extends Component {
 
 object ctrlpath_datapath_unionSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrlpath_datapath_union(NttCfg2414(nttPoint = 128,paraNum = 8)))
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrlpath_datapath_union(NttCfg2414(nttPoint = 64,paraNum = 4)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)

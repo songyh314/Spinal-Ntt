@@ -10,6 +10,145 @@ import spinal.lib.eda.xilinx.VivadoFlow
 
 import scala.collection.mutable
 
+object shuffleMux {
+  // 0,1,4 -> 0/4
+  case class sfMuxp4ch0_4(sw: Int = 3, expect: Int, id:Seq[Int]) extends Component {
+    val io = new Bundle {
+      val muxIn = in Vec (UInt(sw bits), 3)
+      val muxOut = out UInt (sw bits)
+    }
+//    val const = Vec(UInt(sw bits))
+    val const = id.map(U(_, sw bits))
+    val flag = io.muxIn.map { item => item === expect }
+    io.muxOut := MuxOH(flag, const)
+  }
+
+  // 1,2,3,5,6 -> 1/5
+  case class sfMuxp4ch1_5(sw: Int = 3, expect: Int, id:Seq[Int]) extends Component {
+    val io = new Bundle {
+      val muxIn = in Vec (UInt(sw bits), 5)
+      val muxOut = out UInt (sw bits)
+    }
+    val const = id.map(U(_, sw bits))
+    val flag = io.muxIn.map { item => item === expect }
+    io.muxOut := MuxOH(flag, const)
+  }
+
+  // 1,2,4,5,6 -> 2/6
+  case class sfMuxp4ch2_6(sw: Int = 3, expect: Int, id:Seq[Int]) extends Component {
+    val io = new Bundle {
+      val muxIn = in Vec (UInt(sw bits), 5)
+      val muxOut = out UInt (sw bits)
+    }
+    val const = id.map(U(_, sw bits))
+    val flag = io.muxIn.map { item => item === expect }
+    io.muxOut := MuxOH(flag, const)
+  }
+
+  // 3,6,7 -> 3/7
+  case class sfMuxp4ch3_7(sw: Int = 3, expect: Int, id:Seq[Int]) extends Component {
+    val io = new Bundle {
+      val muxIn = in Vec (UInt(sw bits), 3)
+      val muxOut = out UInt (sw bits)
+    }
+    val const = id.map(U(_, sw bits))
+    val flag = io.muxIn.map { item => item === expect }
+    io.muxOut := MuxOH(flag, const)
+  }
+
+}
+object sfMuxp4ch0_4Genv extends App {
+  import shuffleMux._
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new sfMuxp4ch0_4(3,0,Seq(0,1,4)))
+}
+
+case class idxDecodeUnitOpt(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val addrOri = in UInt (g.BankAddrWidth bits)
+    val idxOri = in UInt (g.BankIndexWidth bits)
+    val idxDec = out UInt (g.BankIndexWidth bits)
+  }
+  noIoPrefix()
+  val bankIdx = Reg(UInt(g.BankIndexWidth bits)) init U(0)
+  val sn = io.addrOri.asBits.xorR ^ io.idxOri.msb
+  //  val bi = io.idxOri +^ (sn(log2Up(g.radix) - 1 downto 0) ## (B"1'b0" #* (log2Up(g.paraNum)))).asUInt
+  //  bankIdx := bi(g.BankIndexWidth - 1 downto 0)
+  io.idxDec := Cat(sn, io.idxOri(0, g.BankIndexWidth - 1 bits)).asUInt
+}
+object idxDecodeUnitOpt {
+  def apply(addr: UInt, idx: UInt, g: NttCfg2414): UInt = {
+    val dut = new idxDecodeUnit(g)
+    dut.io.addrOri := addr
+    dut.io.idxOri := idx
+    dut.io.idxDec
+  }
+}
+
+case class shuffleOpt(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    val addrOri = in Vec (UInt(g.BankAddrWidth bits), g.radix)
+    val idxOri = in Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val idxDec = out Vec (UInt(g.BankIndexWidth bits), g.BI)
+    val idxShuffle = out Vec (UInt(g.BankIndexWidth bits), g.BI)
+  }
+
+  val addrFlat = Vec(UInt(g.BankAddrWidth bits), g.BI)
+  for (i <- 0 until g.BI) {
+    addrFlat(i) := io.addrOri(i % g.radix)
+  }
+  val decTmp = Vec(UInt(g.BankIndexWidth bits), g.BI)
+  decTmp.zip((io.idxOri).zip(addrFlat)).foreach { case (port, (idx, addr)) =>
+    port := idxDecodeUnitOpt(addr = addr, idx = idx, g = g)
+  }
+  io.idxDec := RegNext(decTmp)
+
+  import shuffleMux._
+  import DataPathTools._
+  if (g.paraNum == 4) {
+    val ch0 = sfMuxp4ch0_4(g.BankIndexWidth, 0, Seq(0, 1, 4))
+    val ch4 = sfMuxp4ch0_4(g.BankIndexWidth, 4, Seq(0, 1, 4))
+    ch0.io.muxIn := muxDrive(Seq(0, 1, 4), decTmp)
+    ch4.io.muxIn := muxDrive(Seq(0, 1, 4), decTmp)
+    io.idxShuffle(0) := RegNext(ch0.io.muxOut); io.idxShuffle(4) := RegNext(ch4.io.muxOut)
+
+    val ch1 = sfMuxp4ch1_5(g.BankIndexWidth, 1, Seq(1, 2, 3, 5, 6))
+    val ch5 = sfMuxp4ch1_5(g.BankIndexWidth, 5, Seq(1, 2, 3, 5, 6))
+    ch1.io.muxIn := muxDrive(Seq(1, 2, 3, 5, 6), decTmp)
+    ch5.io.muxIn := muxDrive(Seq(1, 2, 3, 5, 6), decTmp)
+    io.idxShuffle(1) := RegNext(ch1.io.muxOut); io.idxShuffle(5) := RegNext(ch5.io.muxOut)
+
+    val ch2 = sfMuxp4ch2_6(g.BankIndexWidth, 2, Seq(1, 2, 4, 5, 6))
+    val ch6 = sfMuxp4ch2_6(g.BankIndexWidth, 6, Seq(1, 2, 4, 5, 6))
+    ch2.io.muxIn := muxDrive(Seq(1, 2, 4, 5, 6), decTmp)
+    ch6.io.muxIn := muxDrive(Seq(1, 2, 4, 5, 6), decTmp)
+    io.idxShuffle(2) := RegNext(ch2.io.muxOut); io.idxShuffle(6) := RegNext(ch6.io.muxOut)
+
+    val ch3 = sfMuxp4ch3_7(g.BankIndexWidth, 3, Seq(3, 6, 7))
+    val ch7 = sfMuxp4ch3_7(g.BankIndexWidth, 7, Seq(3, 6, 7))
+    ch3.io.muxIn := muxDrive(Seq(3, 6, 7), decTmp)
+    ch7.io.muxIn := muxDrive(Seq(3, 6, 7), decTmp)
+    io.idxShuffle(3) := RegNext(ch3.io.muxOut); io.idxShuffle(7) := RegNext(ch7.io.muxOut)
+  }
+}
+
+object shuffleOptGenv extends App {
+  import shuffleMux._
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new shuffleOpt(NttCfg2414()))
+}
+
+
 case class idxDecodeUnit(g: NttCfg2414) extends Component {
   val io = new Bundle {
     val addrOri = in UInt (g.BankAddrWidth bits)
@@ -337,82 +476,82 @@ case class memOutArb(g: NttCfg2414) extends Component {
 
     val ch0 = new dataMux2ch0_15p8(g.width)
     ch0.io.sel := idx(0)
-    ch0.io.muxIn := muxDrive(Seq(0,8),dataMem)
+    ch0.io.muxIn := muxDrive(Seq(0, 8), dataMem)
     io.dataOrder(0) := ch0.io.muxOut
 
     val ch1 = new dataMux8ch1p8(g.width)
     ch1.io.sel := idx(1)
-    ch1.io.muxIn := muxDrive(Seq(0,1,2,4,8,9,10,12),io.dataMem)
+    ch1.io.muxIn := muxDrive(Seq(0, 1, 2, 4, 8, 9, 10, 12), io.dataMem)
     io.dataOrder(1) := ch1.io.muxOut
 
     val ch2 = new dataMux4ch2_13p8(g.width)
     ch2.io.sel := idx(2)
-    ch2.io.muxIn := muxDrive(Seq(1,2,9,10),dataMem)
+    ch2.io.muxIn := muxDrive(Seq(1, 2, 9, 10), dataMem)
     io.dataOrder(2) := ch2.io.muxOut
 
     val ch3 = new dataMux6ch3_9_10p8(g.width)
     ch3.io.sel := idx(3)
-    ch3.io.muxIn := muxDrive(Seq(1,3,5,9,10,11),dataMem)
+    ch3.io.muxIn := muxDrive(Seq(1, 3, 5, 9, 10, 11), dataMem)
     io.dataOrder(3) := ch3.io.muxOut
 
     val ch4 = new dataMux4ch4_7_8_11p8(g.width)
     ch4.io.sel := idx(4)
-    ch4.io.muxIn := muxDrive(Seq(2,4,10,12),dataMem)
+    ch4.io.muxIn := muxDrive(Seq(2, 4, 10, 12), dataMem)
     io.dataOrder(4) := ch4.io.muxOut
 
     val ch5 = new dataMux6ch5_6_12p8(g.width)
     ch5.io.sel := idx(5)
-    ch5.io.muxIn := muxDrive(Seq(2,5,6,10,13,14),dataMem)
+    ch5.io.muxIn := muxDrive(Seq(2, 5, 6, 10, 13, 14), dataMem)
     io.dataOrder(5) := ch5.io.muxOut
 
     val ch6 = new dataMux6ch5_6_12p8(g.width)
     ch6.io.sel := idx(6)
-    ch6.io.muxIn := muxDrive(Seq(3,5,6,11,13,14),dataMem)
+    ch6.io.muxIn := muxDrive(Seq(3, 5, 6, 11, 13, 14), dataMem)
     io.dataOrder(6) := ch6.io.muxOut
 
     val ch7 = new dataMux4ch4_7_8_11p8(g.width)
     ch7.io.sel := idx(7)
-    ch7.io.muxIn := muxDrive(Seq(3,7,11,15),dataMem)
+    ch7.io.muxIn := muxDrive(Seq(3, 7, 11, 15), dataMem)
     io.dataOrder(7) := ch7.io.muxOut
 
     val ch8 = new dataMux4ch4_7_8_11p8(g.width)
     ch8.io.sel := idx(8)
-    ch8.io.muxIn := muxDrive(Seq(0,4,8,12),dataMem)
+    ch8.io.muxIn := muxDrive(Seq(0, 4, 8, 12), dataMem)
     io.dataOrder(8) := ch8.io.muxOut
 
     val ch9 = new dataMux6ch3_9_10p8(g.width)
     ch9.io.sel := idx(9)
-    ch9.io.muxIn := muxDrive(Seq(1,2,4,9,10,12),dataMem)
+    ch9.io.muxIn := muxDrive(Seq(1, 2, 4, 9, 10, 12), dataMem)
     io.dataOrder(9) := ch9.io.muxOut
 
     val ch10 = new dataMux6ch3_9_10p8(g.width)
     ch10.io.sel := idx(10)
-    ch10.io.muxIn := muxDrive(Seq(1,2,5,9,10,13),dataMem)
+    ch10.io.muxIn := muxDrive(Seq(1, 2, 5, 9, 10, 13), dataMem)
     io.dataOrder(10) := ch10.io.muxOut
 
     val ch11 = new dataMux4ch4_7_8_11p8(g.width)
     ch11.io.sel := idx(11)
-    ch11.io.muxIn := muxDrive(Seq(3,5,11,13),dataMem)
+    ch11.io.muxIn := muxDrive(Seq(3, 5, 11, 13), dataMem)
     io.dataOrder(11) := ch11.io.muxOut
 
     val ch12 = new dataMux6ch5_6_12p8(g.width)
     ch12.io.sel := idx(12)
-    ch12.io.muxIn := muxDrive(Seq(2,4,6,10,12,14),dataMem)
+    ch12.io.muxIn := muxDrive(Seq(2, 4, 6, 10, 12, 14), dataMem)
     io.dataOrder(12) := ch12.io.muxOut
 
     val ch13 = new dataMux4ch2_13p8(g.width)
     ch13.io.sel := idx(13)
-    ch13.io.muxIn := muxDrive(Seq(5,6,13,14),dataMem)
+    ch13.io.muxIn := muxDrive(Seq(5, 6, 13, 14), dataMem)
     io.dataOrder(13) := ch13.io.muxOut
 
     val ch14 = new dataMux8ch14p8(g.width)
     ch14.io.sel := idx(14)
-    ch14.io.muxIn := muxDrive(Seq(3,5,6,7,11,13,14,15),dataMem)
+    ch14.io.muxIn := muxDrive(Seq(3, 5, 6, 7, 11, 13, 14, 15), dataMem)
     io.dataOrder(14) := ch14.io.muxOut
 
     val ch15 = new dataMux2ch0_15p8(g.width)
     ch15.io.sel := idx(15)
-    ch15.io.muxIn := muxDrive(Seq(7,15),dataMem)
+    ch15.io.muxIn := muxDrive(Seq(7, 15), dataMem)
     io.dataOrder(15) := ch15.io.muxOut
 
   } else { null }

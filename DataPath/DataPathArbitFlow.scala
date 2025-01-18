@@ -59,3 +59,31 @@ object DataPathTopVivadoFlow extends App {
   }
 
 }
+
+
+
+object NttTopVivadoFlow extends App {
+  val g = NttCfg2414()
+  val useIp = false
+  val workspace = "NttOpt/fpga/DataPath/shuffleOpt"
+  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
+  val family = "Zynq UltraScale+ MPSoCS"
+  val device = "xczu9eg-ffvb1156-2-i"
+  //  val family = "Virtex 7"
+  //  val device = "xc7vx485tffg1157-1"
+  val frequency = 300 MHz
+  val cpu = 16
+  val paths = Seq(
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/shuffleOpt.v",
+  )
+  val rtl = new Rtl {
+
+    /** Name */
+    override def getName(): String = "shuffleOpt"
+
+    override def getRtlPaths(): Seq[String] = paths
+  }
+  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
+  println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
+
+}
