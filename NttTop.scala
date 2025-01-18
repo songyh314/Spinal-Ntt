@@ -89,7 +89,7 @@ object NttTopGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/NttTop",
     genLineComments = true
-  ).generate(new NttTop(NttCfg2414()))
+  ).generate(new NttTop(NttCfg2414(paraNum = 8)))
 }
 
 object NttTopSim extends App {

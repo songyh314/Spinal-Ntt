@@ -66,12 +66,12 @@ case class twRom(g: NttCfg2414) extends Component {
     val twData = out Vec (UInt(g.width bits), g.paraNum)
   }
 
-  def initTable = for (i <- 0 until (g.twNum)) yield {
-    val ret: BigInt =
-      ((BigInt(i) * 4 + 3) << 72) + ((BigInt(i) * 4 + 2) << 48) + ((BigInt(i) * 4 + 1) << 24) + (BigInt(i) * 4)
-//    println(ret)
-    B(ret, g.twWidth bits)
-  }
+//  def initTable = for (i <- 0 until (g.twNum)) yield {
+//    val ret: BigInt =
+//      ((BigInt(i) * 4 + 3) << 72) + ((BigInt(i) * 4 + 2) << 48) + ((BigInt(i) * 4 + 1) << 24) + (BigInt(i) * 4)
+////    println(ret)
+//    B(ret, g.twWidth bits)
+//  }
   val tw = g.twCompress.map(B(_, g.twWidth bits))
   val tw128 = g.twCompress128.map(B(_, g.twWidth bits))
   val tw256 = g.twCompress256.map(B(_, g.twWidth bits))
@@ -80,7 +80,7 @@ case class twRom(g: NttCfg2414) extends Component {
     Bits(g.twWidth bits),
     initialContent = if (g.nttPoint == 256) { tw256 }
     else if (g.nttPoint == 1024) { tw }
-    else { initTable }
+    else { g.initTableCompress.map(B(_, g.twWidth bits)) }
   )
   val muxReg = RegNextWhen(io.twBus.payload.twMux, io.twBus.valid)
   val readSeq = rom.readSync(io.twBus.payload.twAddr, io.twBus.valid)

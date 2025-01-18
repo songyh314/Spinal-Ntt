@@ -28,7 +28,7 @@ case class CtrlDecodeUnion(g: NttCfg2414) extends Component {
 
 object CtrlDecodeUnionSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new CtrlDecodeUnion(NttCfg2414(nttPoint = 128, paraNum = 4)))
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new CtrlDecodeUnion(NttCfg2414(nttPoint = 128, paraNum = 8)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)
@@ -83,7 +83,7 @@ case class ctrl_memForwardCtrl_union(g:NttCfg2414) extends Component {
 
 object ctrl_memForwardCtrl_unionSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrl_memForwardCtrl_union(NttCfg2414(nttPoint = 128, paraNum = 4)))
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrl_memForwardCtrl_union(NttCfg2414(nttPoint = 128, paraNum = 8)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)
@@ -165,7 +165,7 @@ case class ctrlpath_datapath_union(g:NttCfg2414) extends Component {
 
 object ctrlpath_datapath_unionSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrlpath_datapath_union(NttCfg2414(nttPoint = 128)))
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrlpath_datapath_union(NttCfg2414(nttPoint = 128,paraNum = 8)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)
@@ -213,6 +213,16 @@ object ctrlpath_datapath_unionSim extends App {
     clockDomain.waitSampling(10)
 
     io.ctrl.isNtt #= true
+    io.ctrl.isCal #= true
+    clockDomain.waitSampling()
+    io.start #= true
+    clockDomain.waitSampling()
+    io.start #= false
+    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
+    clockDomain.waitSampling(10)
+    io.ctrl.isCal #= false
+
+    io.ctrl.isNtt #= false
     io.ctrl.isCal #= true
     clockDomain.waitSampling()
     io.start #= true

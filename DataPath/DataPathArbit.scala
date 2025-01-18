@@ -124,6 +124,72 @@ case class memInMux(g: NttCfg2414) extends Component {
     ch7.io.sel := idxIn(7)
     io.dataOut(7) := ch7.io.muxOut.setName("ch7")
 
+  } else if (g.paraNum == 8) {
+
+    val ch0 = Mux3ch0_8p8(g.width)
+    val ch8 = Mux3ch0_8p8(g.width)
+    ch0.io.sel := idxIn(0)
+    ch8.io.sel := idxIn(8)
+    ch0.io.muxIn := muxDrive(Seq(0, 1, 8), dataIn)
+    ch8.io.muxIn := muxDrive(Seq(0, 1, 8), dataIn)
+    dataOut(0) := ch0.io.muxOut; dataOut(8) := ch8.io.muxOut
+
+    val ch1 = Mux5ch1_9p8(g.width)
+    val ch9 = Mux5ch1_9p8(g.width)
+    ch1.io.sel := idxIn(1)
+    ch9.io.sel := idxIn(9)
+    ch1.io.muxIn := muxDrive(Seq(1, 2, 3, 9, 10), dataIn)
+    ch9.io.muxIn := muxDrive(Seq(1, 2, 3, 9, 10), dataIn)
+    dataOut(1) := ch1.io.muxOut; dataOut(9) := ch9.io.muxOut
+
+    val ch2 = Mux7ch2_10p8(g.width)
+    val ch10 = Mux7ch2_10p8(g.width)
+    ch2.io.sel := idxIn(2)
+    ch10.io.sel := idxIn(10)
+    ch2.io.muxIn := muxDrive(Seq(1, 2, 4, 5, 9, 10, 12), dataIn)
+    ch10.io.muxIn := muxDrive(Seq(1, 2, 4, 5, 9, 10, 12), dataIn)
+    dataOut(2) := ch2.io.muxOut; dataOut(10) := ch10.io.muxOut
+
+    val ch3 = Mux5ch3_11p8(g.width)
+    val ch11 = Mux5ch3_11p8(g.width)
+    ch3.io.sel := idxIn(3)
+    ch11.io.sel := idxIn(11)
+    ch3.io.muxIn := muxDrive(Seq(3, 6, 7, 11, 14), dataIn)
+    ch11.io.muxIn := muxDrive(Seq(3, 6, 7, 11, 14), dataIn)
+    dataOut(3) := ch3.io.muxOut; dataOut(11) := ch11.io.muxOut
+
+    val ch4 = Mux5ch4_12p8(g.width)
+    val ch12 = Mux5ch4_12p8(g.width)
+    ch4.io.sel := idxIn(4)
+    ch12.io.sel := idxIn(12)
+    ch4.io.muxIn := muxDrive(Seq(1, 4, 8, 9, 12), dataIn)
+    ch12.io.muxIn := muxDrive(Seq(1, 4, 8, 9, 12), dataIn)
+    dataOut(4) := ch4.io.muxOut; dataOut(12) := ch12.io.muxOut
+
+    val ch5 = Mux7ch5_13p8(g.width)
+    val ch13 = Mux7ch5_13p8(g.width)
+    ch5.io.sel := idxIn(5)
+    ch13.io.sel := idxIn(13)
+    ch5.io.muxIn := muxDrive(Seq(3, 5, 6, 10, 11, 13, 14), dataIn)
+    ch13.io.muxIn := muxDrive(Seq(3, 5, 6, 10, 11, 13, 14), dataIn)
+    dataOut(5) := ch5.io.muxOut; dataOut(13) := ch13.io.muxOut
+
+    val ch6 = Mux5ch6_14p8(g.width)
+    val ch14 = Mux5ch6_14p8(g.width)
+    ch6.io.sel := idxIn(6)
+    ch14.io.sel := idxIn(14)
+    ch6.io.muxIn := muxDrive(Seq(5, 6, 12, 13, 14), dataIn)
+    ch14.io.muxIn := muxDrive(Seq(5, 6, 12, 13, 14), dataIn)
+    dataOut(6) := ch6.io.muxOut; dataOut(14) := ch14.io.muxOut
+
+    val ch7 = Mux3ch7_15p8(g.width)
+    val ch15 = Mux3ch7_15p8(g.width)
+    ch7.io.sel := idxIn(7)
+    ch15.io.sel := idxIn(15)
+    ch7.io.muxIn := muxDrive(Seq(7, 14, 15), dataIn)
+    ch15.io.muxIn := muxDrive(Seq(7, 14, 15), dataIn)
+    dataOut(7) := ch7.io.muxOut; dataOut(15) := ch15.io.muxOut
+
   } else { null }
 
 }
@@ -267,6 +333,88 @@ case class memOutArb(g: NttCfg2414) extends Component {
     ch7.io.muxIn := muxDrive(Seq(3, 7), dataMem)
     ch7.io.sel := idx(7).msb
     dataOrder(7) := ch7.io.muxOut
+  } else if (g.paraNum == 8) {
+
+    val ch0 = new dataMux2ch0_15p8(g.width)
+    ch0.io.sel := idx(0)
+    ch0.io.muxIn := muxDrive(Seq(0,8),dataMem)
+    io.dataOrder(0) := ch0.io.muxOut
+
+    val ch1 = new dataMux8ch1p8(g.width)
+    ch1.io.sel := idx(1)
+    ch1.io.muxIn := muxDrive(Seq(0,1,2,4,8,9,10,12),io.dataMem)
+    io.dataOrder(1) := ch1.io.muxOut
+
+    val ch2 = new dataMux4ch2_13p8(g.width)
+    ch2.io.sel := idx(2)
+    ch2.io.muxIn := muxDrive(Seq(1,2,9,10),dataMem)
+    io.dataOrder(2) := ch2.io.muxOut
+
+    val ch3 = new dataMux6ch3_9_10p8(g.width)
+    ch3.io.sel := idx(3)
+    ch3.io.muxIn := muxDrive(Seq(1,3,5,9,10,11),dataMem)
+    io.dataOrder(3) := ch3.io.muxOut
+
+    val ch4 = new dataMux4ch4_7_8_11p8(g.width)
+    ch4.io.sel := idx(4)
+    ch4.io.muxIn := muxDrive(Seq(2,4,10,12),dataMem)
+    io.dataOrder(4) := ch4.io.muxOut
+
+    val ch5 = new dataMux6ch5_6_12p8(g.width)
+    ch5.io.sel := idx(5)
+    ch5.io.muxIn := muxDrive(Seq(2,5,6,10,13,14),dataMem)
+    io.dataOrder(5) := ch5.io.muxOut
+
+    val ch6 = new dataMux6ch5_6_12p8(g.width)
+    ch6.io.sel := idx(6)
+    ch6.io.muxIn := muxDrive(Seq(3,5,6,11,13,14),dataMem)
+    io.dataOrder(6) := ch6.io.muxOut
+
+    val ch7 = new dataMux4ch4_7_8_11p8(g.width)
+    ch7.io.sel := idx(7)
+    ch7.io.muxIn := muxDrive(Seq(3,7,11,15),dataMem)
+    io.dataOrder(7) := ch7.io.muxOut
+
+    val ch8 = new dataMux4ch4_7_8_11p8(g.width)
+    ch8.io.sel := idx(8)
+    ch8.io.muxIn := muxDrive(Seq(0,4,8,12),dataMem)
+    io.dataOrder(8) := ch8.io.muxOut
+
+    val ch9 = new dataMux6ch3_9_10p8(g.width)
+    ch9.io.sel := idx(9)
+    ch9.io.muxIn := muxDrive(Seq(1,2,4,9,10,12),dataMem)
+    io.dataOrder(9) := ch9.io.muxOut
+
+    val ch10 = new dataMux6ch3_9_10p8(g.width)
+    ch10.io.sel := idx(10)
+    ch10.io.muxIn := muxDrive(Seq(1,2,5,9,10,13),dataMem)
+    io.dataOrder(10) := ch10.io.muxOut
+
+    val ch11 = new dataMux4ch4_7_8_11p8(g.width)
+    ch11.io.sel := idx(11)
+    ch11.io.muxIn := muxDrive(Seq(3,5,11,13),dataMem)
+    io.dataOrder(11) := ch11.io.muxOut
+
+    val ch12 = new dataMux6ch5_6_12p8(g.width)
+    ch12.io.sel := idx(12)
+    ch12.io.muxIn := muxDrive(Seq(2,4,6,10,12,14),dataMem)
+    io.dataOrder(12) := ch12.io.muxOut
+
+    val ch13 = new dataMux4ch2_13p8(g.width)
+    ch13.io.sel := idx(13)
+    ch13.io.muxIn := muxDrive(Seq(5,6,13,14),dataMem)
+    io.dataOrder(13) := ch13.io.muxOut
+
+    val ch14 = new dataMux8ch14p8(g.width)
+    ch14.io.sel := idx(14)
+    ch14.io.muxIn := muxDrive(Seq(3,5,6,7,11,13,14,15),dataMem)
+    io.dataOrder(14) := ch14.io.muxOut
+
+    val ch15 = new dataMux2ch0_15p8(g.width)
+    ch15.io.sel := idx(15)
+    ch15.io.muxIn := muxDrive(Seq(7,15),dataMem)
+    io.dataOrder(15) := ch15.io.muxOut
+
   } else { null }
 }
 object memOutArb {
@@ -430,51 +578,4 @@ case class DataPathTop(g: NttCfg2414) extends Component {
   io.NttPayload.toSeq.zip(tw.rom.io.twData).foreach { case (t1, t2) => t1.payload.Tw := t2 }
   mem.io.memIf.zip(mem_rd_IF.toSeq).foreach { case (t1, t2) => t1 << t2 }
   mem.io.memIf.zip(mem_wr_IF.toSeq).foreach { case (t1, t2) => t1 << t2 }
-}
-object DataPathTopGenV extends App {
-  SpinalConfig(
-    mode = Verilog,
-    nameWhenByFile = false,
-    anonymSignalPrefix = "tmp",
-    targetDirectory = "NttOpt/rtl/DataPath",
-    genLineComments = true
-  ).generate(new DataPathTop(NttCfg2414()))
-}
-object DataPathTopVivadoFlow extends App {
-  val g = NttCfg2414()
-  val useIp = false
-  val workspace = "NttOpt/fpga/DataPathTop"
-  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
-  val family = "Zynq UltraScale+ MPSoCS"
-  val device = "xczu9eg-ffvb1156-2-i"
-//    val family = "Virtex 7"
-//    val device = "xc7vx485tffg1157-1"
-  val frequency = 300 MHz
-  val cpu = 16
-  val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mem.xcix"
-  val paths = Seq(
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/DataPathTop.v",
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/DataPathTop.v_toplevel_tw_rom_rom.bin",
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/bram.v"
-  )
-  if (g.useBramIP) {
-    val rtl = new Rtl {
-
-      /** Name */
-      override def getName(): String = "DataPathTop"
-      override def getRtlPaths(): Seq[String] = paths
-    }
-    val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu, xcix = xcix)
-    println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
-  } else {
-    val rtl = new Rtl {
-
-      /** Name */
-      override def getName(): String = "DataPathTop"
-      override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/DataPathTop.v"
-    }
-    val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
-    println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
-  }
-
 }
