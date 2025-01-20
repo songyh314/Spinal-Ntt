@@ -82,15 +82,6 @@ case class NttTop(g: NttCfg2414, debug: Boolean = false) extends Component {
     io.bfuIn.toSeq.zip(ctrlMem.io.NttPayload.toSeq).foreach { case (t1, t2) => t1 := t2 }
   }
 }
-object NttTopGenV extends App {
-  SpinalConfig(
-    mode = Verilog,
-    nameWhenByFile = false,
-    anonymSignalPrefix = "tmp",
-    targetDirectory = "NttOpt/rtl/NttTop",
-    genLineComments = true
-  ).generate(new NttTop(NttCfg2414(paraNum = 8)))
-}
 
 object NttTopSim extends App {
   val period = 10
@@ -287,6 +278,17 @@ object NttTopSim extends App {
     clockDomain.waitSampling(10)
   }
 }
+
+object NttTopGenV extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/NttTop",
+    genLineComments = true
+  ).generate(new NttTop(NttCfg2414(nttPoint = 1024,paraNum = 4)))
+}
+
 
 object NttTopVivadoFlow extends App {
   val g = NttCfg2414()

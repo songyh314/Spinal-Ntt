@@ -134,6 +134,7 @@ case class FastMod2414_preOpt(g: NttCfg2414) extends Component {
   io.dataOut.valid := valid
 }
 
+
 //case class simEnv() extends FastMod2414(NttCfg2414()) {
 //  val drvQueue = mutable.Queue[BigInt]()
 //  val drvMon = mutable.Queue[BigInt]()

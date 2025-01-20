@@ -53,6 +53,9 @@ case class bram(width: Int = 24, addrWidth: Int = 7, depth: Int = 128) extends B
   addRTLPath("/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/bram.v")
 }
 
+
+
+
 case class twRom(g: NttCfg2414) extends Component {
   val io = new Bundle {
 //    val rdIf = slave (myRamReadOnly(config = myRamConfig(dataWidth = g.twWidth, addrWidth = g.twAddrWidth, readLatency = 1)))
@@ -66,20 +69,17 @@ case class twRom(g: NttCfg2414) extends Component {
     val twData = out Vec (UInt(g.width bits), g.paraNum)
   }
 
-//  def initTable = for (i <- 0 until (g.twNum)) yield {
-//    val ret: BigInt =
-//      ((BigInt(i) * 4 + 3) << 72) + ((BigInt(i) * 4 + 2) << 48) + ((BigInt(i) * 4 + 1) << 24) + (BigInt(i) * 4)
-////    println(ret)
-//    B(ret, g.twWidth bits)
-//  }
+
   val tw = g.twCompress.map(B(_, g.twWidth bits))
   val tw128 = g.twCompress128.map(B(_, g.twWidth bits))
   val tw256 = g.twCompress256.map(B(_, g.twWidth bits))
-//  val rom = Mem(Bits(g.twWidth bits),g.nttPoint/g.paraNum)
+//  val tw4096 = g.twCompress4096.map(B(_, g.twWidth bits))
+
   val rom = Mem(
     Bits(g.twWidth bits),
     initialContent = if (g.nttPoint == 256) { tw256 }
     else if (g.nttPoint == 1024) { tw }
+//    else if (g.nttPoint == 4096) { tw4096 }
     else { g.initTableCompress.map(B(_, g.twWidth bits)) }
   )
   val muxReg = RegNextWhen(io.twBus.payload.twMux, io.twBus.valid)
