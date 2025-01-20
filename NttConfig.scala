@@ -2,21 +2,34 @@ package Ntt
 import spinal.core._
 import spinal.lib._
 
+import scala.collection.mutable.ArrayBuffer
+
 object tools {
-  def wordCat(data: Seq[BigInt], n: Int, width: Int): Seq[BigInt] = {
+  def wordCat(data:Seq[BigInt],n:Int,width:Int):Seq[BigInt] = {
     data
       .grouped(n)
       .map { item =>
-        {
-          var ret = BigInt(0)
-          item.zipWithIndex.foreach { case (t1, idx) =>
-            ret = ret + (t1 << (width * (idx)))
-          }
-          ret
+      {
+        var ret = BigInt(0)
+        item.zipWithIndex.foreach { case (t1, idx) =>
+          ret = ret + (t1 << (width * (idx)))
         }
+        ret
+      }
       }
       .toSeq
   }
+//
+//
+//  def wordCat(data: Seq[BigInt], n: Int, width: Int): Seq[BigInt] = {
+//    if (n >= 1024) {
+//      val dataSlice = data.grouped(1024).map {item => wordCatsub(item,1024,width)}
+//      dataSlice.flatten.toSeq
+//    } else {
+//      wordCatsub(data,n, width)
+//    }
+//  }
+
 }
 
 object NttCfg {
@@ -43,6 +56,7 @@ object NttCfg {
     val DecodeMuxRegLatency = 1 // mux -> register -> out
     val DecodeLatency = DecodeCalLatency + DecodeMuxRegLatency
     val ramLatency = 1
+    val romMuxLatency = 1
     val DatDeMuxLatency = 1 // addrdecode -> mem -> datademux -> bfu
     val addrNttLoopLatency = ramLatency + BfuNttDelay + BfuRegisterIoDelay
     val addrInttLoopLatency = ramLatency + BfuInttDelay + BfuRegisterIoDelay
@@ -102,9 +116,13 @@ object NttCfg {
       11055232, 640953, 12912026, 9504902, 15508953, 5128017, 12048975, 2060257, 9504357, 2547733, 16048733, 1618522,
       10243994, 2515591, 10268196, 1676041, 9438321, 145829, 7803698, 11216936, 12061622, 10078830, 9080490, 10942343)
 
+    val tw1024p8 = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/rom/tw1024p8.bin"
+
+
 
     val twCompress128 = tools.wordCat(tw128, paraNum, width)
     val twCompress256 = tools.wordCat(tw256, paraNum, width)
+
     val initTableCompress = tools.wordCat(initTable, paraNum, width)
     val tw: Seq[BigInt] = Seq(0, 7137274, 9791491, 9529539, 5336149, 496091, 8502265, 13549951, 9567998, 7228067,
       5317357, 13789582, 104257, 13594383, 12943322, 6010615, 2368341, 14192771, 5002617, 15574480, 1529312, 11783397,

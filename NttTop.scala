@@ -91,7 +91,7 @@ object NttTopSim extends App {
     .workspacePath("./NttOpt/sim/")
     .withXSimSourcesPaths(path, path)
     .withWave
-    .compile(new NttTop(NttCfg2414(nttPoint = 1024,paraNum = 4), debug = false))
+    .compile(new NttTop(NttCfg2414(nttPoint = 1024, paraNum = 4), debug = false))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)
@@ -286,27 +286,45 @@ object NttTopGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/NttTop",
     genLineComments = true
-  ).generate(new NttTop(NttCfg2414(nttPoint = 1024,paraNum = 4)))
+  ).generate(new NttTop(NttCfg2414(nttPoint = 1024, paraNum = 8)))
 }
-
 
 object NttTopVivadoFlow extends App {
   val g = NttCfg2414()
   val useIp = false
   val workspace = "NttOpt/fpga/NttTop"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
-  val family = "Zynq UltraScale+ MPSoCS"
-  val device = "xczu9eg-ffvb1156-2-i"
-//  val family = "Virtex 7"
-//  val device = "xc7vx485tffg1157-1"
+//  val family = "Zynq UltraScale+ MPSoCS"
+//  val device = "xczu9eg-ffvb1156-2-i"
+  val family = "Virtex 7"
+  val device = "xc7vx485tffg1157-1"
   val frequency = 300 MHz
   val cpu = 16
-  val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
-  val paths = Seq(
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop/NttTop.v",
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v",
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop/NttTop.v_toplevel_ctrlMem_dut_tw_rom_rom.bin"
-  )
+  val useWrapRom = true
+  if (device == "xczu9eg-ffvb1156-2-i") {
+    val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
+  } else if (device == "xc7vx485tffg1157-1") {
+    val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/V7/mult_gen_0.xcix"
+  }
+
+  val xcix = if (device == "xczu9eg-ffvb1156-2-i") {
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
+  } else if (device == "xc7vx485tffg1157-1") {
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/V7/mult_gen_0.xcix"
+  } else { null }
+
+  val paths = if (useWrapRom) {
+    Seq(
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop/NttTop.v",
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v"
+    )
+  } else {
+    Seq(
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop/NttTop.v",
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v",
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop/NttTop.v_toplevel_ctrlMem_dut_tw_rom_rom.bin"
+    )
+  }
   val rtl = new Rtl {
 
     /** Name */

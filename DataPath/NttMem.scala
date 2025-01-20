@@ -4,6 +4,7 @@ import Ntt.NttCfg._
 import myRam._
 import spinal.core._
 import spinal.lib._
+import spinal.core.BlackBox
 import spinal.lib.eda.bench.Rtl
 import spinal.lib.eda.xilinx.VivadoFlow
 
@@ -53,6 +54,53 @@ case class bram(width: Int = 24, addrWidth: Int = 7, depth: Int = 128) extends B
   addRTLPath("/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/bram.v")
 }
 
+case class romBlackBox(addrW:Int, W:Int, depth:Int, path:String) extends BlackBox {
+  addGeneric("width",W)
+  addGeneric("depth",depth)
+  val io = new Bundle{
+    val clk = in Bool()
+    val addr = in UInt(addrW bits)
+    val data = out Bits(W bits)
+  }
+  noIoPrefix()
+//  val path = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop/NttTop.v_toplevel_ctrlMem_dut_tw_rom_rom.bin"
+  setInlineVerilog(
+    s"""
+      |module romBlackBox #(
+      |    parameter width = 96,
+      |    parameter depth = 156
+      |) (
+      |    input  wire                     clk,
+      |    input  wire [$$clog2(depth)-1:0] addr,
+      |    output wire [        width-1:0] data
+      |);
+      |  (* ram_style = "block" *) reg [width-1:0] mem[depth-1:0];
+      |  initial begin
+      |    $$readmemb("$path", mem);
+      |  end
+      |  reg [width-1:0] data_reg = 'd0;
+      |  always @(posedge clk) begin
+      |    data_reg <= mem[addr];
+      |  end
+      |endmodule
+      |""".stripMargin)
+  mapClockDomain(clock = io.clk)
+}
+case class romWrap(g:NttCfg2414) extends Component{
+  val io = new Bundle{
+    val addr = in UInt(g.twAddrWidth bits)
+    val data = out Bits(g.twWidth bits)
+  }
+  val m = new romBlackBox(addrW = g.twAddrWidth, W = g.twWidth, depth = g.twNum,path = {
+    if (g.nttPoint == 1024 && g.paraNum == 8){g.tw1024p8} else {null}
+  })
+  m.io.addr := io.addr
+  io.data := m.io.data
+}
+object romWrapGenV extends App {
+  SpinalConfig(mode = Verilog, targetDirectory = "./rtl/Ntt/memBank").generate(new romWrap(NttCfg2414()))
+}
+
 
 
 
@@ -86,19 +134,47 @@ case class twRom(g: NttCfg2414) extends Component {
   val readSeq = rom.readSync(io.twBus.payload.twAddr, io.twBus.valid)
   val sliceSeq = readSeq.subdivideIn(g.paraNum slices).map(_.asUInt)
   def readMux(sel: UInt): UInt = {
-    val ret = sliceSeq.read(sel)
+    val ret = RegNext(sliceSeq.read(sel))
     ret
   }
   io.twData.zip(muxReg).foreach { case (t1, t2) => t1 := readMux(t2) }
 }
-object twRomGenV extends App {
+
+case class twRomWrap(g: NttCfg2414) extends Component {
+  val io = new Bundle {
+    //    val rdIf = slave (myRamReadOnly(config = myRamConfig(dataWidth = g.twWidth, addrWidth = g.twAddrWidth, readLatency = 1)))
+    //    val rAddr = in UInt (g.twAddrWidth bits)
+    //    val re = in Bool ()
+    val twBus = slave Flow twPayload(
+      addrWidth = g.twAddrWidth,
+      muxWidth = log2Up(g.paraNum),
+      para = g.paraNum
+    )
+    val twData = out Vec (UInt(g.width bits), g.paraNum)
+  }
+
+  //  val tw4096 = g.twCompress4096.map(B(_, g.twWidth bits))
+  val rom = new romWrap(g)
+  rom.io.addr := io.twBus.twAddr
+  val muxReg = RegNextWhen(io.twBus.payload.twMux, io.twBus.valid)
+  val readSeq = rom.io.data
+  val sliceSeq = readSeq.subdivideIn(g.paraNum slices).map(_.asUInt)
+  def readMux(sel: UInt): UInt = {
+    val ret = RegNext(sliceSeq.read(sel))
+    ret
+  }
+  io.twData.zip(muxReg).foreach { case (t1, t2) => t1 := readMux(t2) }
+}
+
+
+object twRomWrapGenV extends App {
   SpinalConfig(
     mode = Verilog,
     nameWhenByFile = false,
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/memBank",
     genLineComments = true
-  ).generate(new twRom(NttCfg2414()))
+  ).generate(new twRomWrap(NttCfg2414()))
 }
 
 case class memBank(g: NttCfg2414) extends Component {
