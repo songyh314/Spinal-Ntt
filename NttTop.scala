@@ -284,7 +284,7 @@ object NttTopGenV extends App {
     mode = Verilog,
     nameWhenByFile = false,
     anonymSignalPrefix = "tmp",
-    targetDirectory = "NttOpt/rtl/NttTop",
+    targetDirectory = "NttOpt/rtl/NttTop1",
     genLineComments = true
   ).generate(new NttTop(NttCfg2414(nttPoint = 1024, paraNum = 8)))
 }
@@ -294,10 +294,10 @@ object NttTopVivadoFlow extends App {
   val useIp = false
   val workspace = "NttOpt/fpga/NttTop"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
-//  val family = "Zynq UltraScale+ MPSoCS"
-//  val device = "xczu9eg-ffvb1156-2-i"
-  val family = "Virtex 7"
-  val device = "xc7vx485tffg1157-1"
+  val family = "Zynq UltraScale+ MPSoCS"
+  val device = "xczu9eg-ffvb1156-2-i"
+//  val family = "Virtex 7"
+//  val device = "xc7vx485tffg1157-1"
   val frequency = 300 MHz
   val cpu = 16
   val useWrapRom = true
@@ -316,7 +316,8 @@ object NttTopVivadoFlow extends App {
   val paths = if (useWrapRom) {
     Seq(
       "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop/NttTop.v",
-      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v"
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v",
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/rom/tw1024p8.bin"
     )
   } else {
     Seq(

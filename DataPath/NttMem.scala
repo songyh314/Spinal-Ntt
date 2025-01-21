@@ -67,8 +67,8 @@ case class romBlackBox(addrW:Int, W:Int, depth:Int, path:String) extends BlackBo
   setInlineVerilog(
     s"""
       |module romBlackBox #(
-      |    parameter width = 96,
-      |    parameter depth = 156
+      |    parameter width = $W,
+      |    parameter depth = $depth
       |) (
       |    input  wire                     clk,
       |    input  wire [$$clog2(depth)-1:0] addr,
