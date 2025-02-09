@@ -1,23 +1,31 @@
 package Ntt
+import Ntt.NttCfg.NttCfg2414
 import spinal.core._
 import spinal.lib._
 
+import scala.io.Source
+import scala.util._
 import scala.collection.mutable.ArrayBuffer
 
 object tools {
-  def wordCat(data:Seq[BigInt],n:Int,width:Int):Seq[BigInt] = {
+  def wordCat(data: Seq[BigInt], n: Int, width: Int): Seq[BigInt] = {
     data
       .grouped(n)
       .map { item =>
-      {
-        var ret = BigInt(0)
-        item.zipWithIndex.foreach { case (t1, idx) =>
-          ret = ret + (t1 << (width * (idx)))
+        {
+          var ret = BigInt(0)
+          item.zipWithIndex.foreach { case (t1, idx) =>
+            ret = ret + (t1 << (width * (idx)))
+          }
+          ret
         }
-        ret
-      }
       }
       .toSeq
+  }
+  def readData(path: String): Seq[BigInt] = {
+    val source = Source.fromFile(path)
+    val ret: Seq[BigInt] = source.getLines().map(_.trim).filter(_.nonEmpty).map(BigInt(_)).toSeq
+    ret
   }
 //
 //
@@ -39,7 +47,10 @@ object NttCfg {
     val N = 14
     val radix = 2
     val useBramIP = false
-    val nttSimPublic = true
+    val useRomIP = false
+    val useMulIP = true
+    val useTwFile = true
+    val nttSimPublic = false
     val AddSubLatencyIntt = 3 // add&sub + rescale
     val AddSubLatencyNtt = 2 // add&sub
     val MultLatency = 4
@@ -68,7 +79,7 @@ object NttCfg {
       bfuValidLoopNttLatency
     }
     val width = M
-    val useMulIP = true
+
     val Prime = BigInt(2).pow(M) - BigInt(2).pow(N) + 1
     val HalfPrime = (Prime + 1) / 2
     val delta = M - N
@@ -80,7 +91,6 @@ object NttCfg {
     val twNum = nttPoint / paraNum
     val twAddrWidth = log2Up(nttPoint / paraNum)
     val twWidth = width * paraNum
-//    val twInitSeq = (0 until nttPoint).map(B(_,width bits)).grouped(paraNum).map(item => Cat(item)).toSeq
     val initTable: Seq[BigInt] = Seq.range(0, nttPoint).map(item => BigInt(item))
     val tw256: Seq[BigInt] = Seq(0, 7137274, 9791491, 9529539, 5336149, 496091, 8502265, 13549951, 9567998, 7228067,
       5317357, 13789582, 104257, 13594383, 12943322, 6010615, 2368341, 14192771, 5002617, 15574480, 1529312, 11783397,
@@ -116,9 +126,13 @@ object NttCfg {
       11055232, 640953, 12912026, 9504902, 15508953, 5128017, 12048975, 2060257, 9504357, 2547733, 16048733, 1618522,
       10243994, 2515591, 10268196, 1676041, 9438321, 145829, 7803698, 11216936, 12061622, 10078830, 9080490, 10942343)
 
-    val tw1024p8 = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/rom/tw1024p8.bin"
 
-
+    val twFilePath = s"/PRJ/SpinalHDL-prj/PRJ/py/nwc_ntt_python/data/tw${nttPoint}p${paraNum}.txt"
+    val twData:Seq[BigInt] = tools.readData(twFilePath)
+    val tw1024p4: Seq[BigInt] = tools.readData("/PRJ/SpinalHDL-prj/PRJ/py/nwc_ntt_python/data/tw1024.txt")
+    val tw1024p8: Seq[BigInt] = tools.readData("/PRJ/SpinalHDL-prj/PRJ/py/nwc_ntt_python/data/tw1024p8.txt")
+    val tw1024p8_path = null
+    val tw4096p8:Seq[BigInt] = tools.readData("/PRJ/SpinalHDL-prj/PRJ/py/nwc_ntt_python/data/tw4096p8.txt")
 
     val twCompress128 = tools.wordCat(tw128, paraNum, width)
     val twCompress256 = tools.wordCat(tw256, paraNum, width)
@@ -355,29 +369,14 @@ object NttCfg {
 
 object test {
   def main(args: Array[String]): Unit = {
-    val seq1 = Seq.range(0, 32).map(item => BigInt(item))
-    val seq1Compress: Seq[BigInt] = seq1
-      .grouped(4)
-      .map { item =>
-        val ret: BigInt = item(0) + (item(1) << 24) + (item(2) << 48) + (item(3) << 72)
-        ret
-      }
-      .toSeq
-    val seq2 = seq1.grouped(4).map { item =>
-      {
-        var ret = BigInt(0)
-        item.zipWithIndex.foreach { case (t1, idx) =>
-//          println(t1, idx)
-          ret = ret + (t1 << (24 * (idx)))
-        }
-//        println(ret)
-        ret
-      }
+    try {
+      val tmp: Seq[BigInt] = tools.readData("/PRJ/SpinalHDL-prj/PRJ/py/nwc_ntt_python/data/tw1024.txt")
+      println(tmp(10))
+    } catch {
+      case e: Exception =>
+        println(s"Error reading : ${e.getMessage}")
     }
-    val seq3 = tools.wordCat(seq1, 4, 24)
-    println(seq1)
-    println(seq2.toList)
-    println(seq3.toList)
-
+    val g = new NttCfg2414(nttPoint = 1024, paraNum = 4)
+    print(g.twFilePath)
   }
 }

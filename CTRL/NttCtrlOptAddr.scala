@@ -99,12 +99,7 @@ case class CtrlOptAddr(g: NttCfg2414) extends Component {
       t1 := dut.io.ins0_seq
       t2 := dut.io.ins1_seq
     }
-//    val ins0_subSeq = Vec(Bits(g.Log2NttPoints bits), g.paraNum)
-//    val ins1_subSeq = Vec(Bits(g.Log2NttPoints bits), g.paraNum)
-//    (ins0_subSeq.zip(ins1_subSeq)).zip(lsbMuxArray.toSeq).foreach { case ((ins0, ins1), dut) =>
-//      ins0 := msbMux.io.ins0_seq ## dut.io.ins0_seq
-//      ins1 := msbMux.io.ins1_seq ## dut.io.ins1_seq
-//    }
+
   }
   import subDut._
   val twGen = new Area {
@@ -159,60 +154,5 @@ case class CtrlOptAddr(g: NttCfg2414) extends Component {
   //  io.TwBus.payload.twMux.zip(twMuxArray.toSeq).foreach { case (t1, t2) => t1 := Delay(t2.io.twMuxUnit,g.DecodeLatency) }
   io.TwBus.valid := fsm.isActive(fsm.LOOP)
   //  io.TwBus.valid := Delay(fsm.isActive(fsm.LOOP),g.DecodeLatency)
-}
-
-
-object CtrlOptAddrGenV extends App {
-  SpinalConfig(
-    mode = Verilog,
-    nameWhenByFile = false,
-    anonymSignalPrefix = "tmp",
-    targetDirectory = "NttOpt/rtl/Ctrl",
-    genLineComments = true
-  ).generate(new CtrlOptAddr(NttCfg2414(paraNum = 32, debug = false)))
-}
-
-
-
-object CtrlOptAddrSim extends App {
-  val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim").compile(new CtrlOptAddr(NttCfg2414(nttPoint = 128, paraNum = 4)))
-  dut.doSim("test") { dut =>
-    import dut._
-    SimTimeout(5000 * period)
-    clockDomain.forkStimulus(period)
-    clockDomain.waitSampling(10)
-    io.start #= true
-    io.isNtt #= true
-    clockDomain.waitSampling()
-    io.start #= false
-    clockDomain.waitSampling(10)
-    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
-    clockDomain.waitSampling(10)
-    io.isNtt #= false
-    io.start #= true
-    clockDomain.waitSampling()
-    io.start #= false
-    clockDomain.waitSampling(10)
-    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
-    clockDomain.waitSampling(10)
-    simSuccess()
-  }
-}
-
-
-object CtrlOptAddrVivadoFlow extends App {
-  val workspace = "NttOpt/fpga/CtrlOptAddr"
-  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
-  val family = "Zynq UltraScale+ MPSoCS"
-  val device = "xczu9eg-ffvb1156-2-i"
-  val frequency = 300 MHz
-  val cpu = 16
-  val rtl = new Rtl {
-    override def getName(): String = "CtrlOptAddr"
-    override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/Ctrl/CtrlOptAddr.v"
-  }
-  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
-  println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea}")
 }
 

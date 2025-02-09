@@ -92,7 +92,7 @@ object NttTopSim extends App {
     .withXSimSourcesPaths(path, path)
     .withWave
     .compile(new NttTop(NttCfg2414(nttPoint = 1024, paraNum = 4), debug = false))
-  dut.doSim("test") { dut =>
+  dut.doSim { dut =>
     import dut._
     SimTimeout(4000 * period)
     clockDomain.forkStimulus(period)
@@ -179,7 +179,7 @@ object NttTopSim extends App {
       }
       p.close()
     }
-
+DataPathTop
     io.ctrl.isNtt #= true
     io.ctrl.isCal #= true
     clockDomain.waitSampling()
@@ -286,7 +286,7 @@ object NttTopGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/NttTop1",
     genLineComments = true
-  ).generate(new NttTop(NttCfg2414(nttPoint = 1024, paraNum = 8)))
+  ).generate(new NttTop(NttCfg2414(nttPoint = 4096, paraNum = 8)))
 }
 
 object NttTopVivadoFlow extends App {
@@ -294,18 +294,18 @@ object NttTopVivadoFlow extends App {
   val useIp = false
   val workspace = "NttOpt/fpga/NttTop"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
-  val family = "Zynq UltraScale+ MPSoCS"
-  val device = "xczu9eg-ffvb1156-2-i"
-//  val family = "Virtex 7"
-//  val device = "xc7vx485tffg1157-1"
+//  val family = "Zynq UltraScale+ MPSoCS"
+//  val device = "xczu9eg-ffvb1156-2-i"
+  val family = "Virtex 7"
+  val device = "xc7vx485tffg1157-1"
   val frequency = 300 MHz
   val cpu = 16
-  val useWrapRom = true
-  if (device == "xczu9eg-ffvb1156-2-i") {
-    val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
-  } else if (device == "xc7vx485tffg1157-1") {
-    val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/V7/mult_gen_0.xcix"
-  }
+  val useWrapRom = false
+//  if (device == "xczu9eg-ffvb1156-2-i") {
+//    val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
+//  } else if (device == "xc7vx485tffg1157-1") {
+//    val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/V7/mult_gen_0.xcix"
+//  }
 
   val xcix = if (device == "xczu9eg-ffvb1156-2-i") {
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
@@ -315,22 +315,20 @@ object NttTopVivadoFlow extends App {
 
   val paths = if (useWrapRom) {
     Seq(
-      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop/NttTop.v",
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop.v",
       "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v",
-      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/rom/tw1024p8.bin"
+      g.twFilePath
     )
   } else {
     Seq(
-      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop/NttTop.v",
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop.v",
       "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v",
-      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop/NttTop.v_toplevel_ctrlMem_dut_tw_rom_rom.bin"
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop.v_toplevel_ctrlMem_dut_tw_rom_rom.bin"
     )
   }
   val rtl = new Rtl {
-
     /** Name */
     override def getName(): String = "NttTop"
-
     override def getRtlPaths(): Seq[String] = paths
   }
   val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu, xcix = xcix)

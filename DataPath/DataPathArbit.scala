@@ -841,7 +841,7 @@ case class DataPathTop(g: NttCfg2414) extends Component {
   val mem_wr_IF = Array.fill(g.BI)(new myRamWriteOnly(config = myRamConfig(g.width, g.BankAddrWidth)))
 
   val tw = new Area {
-    val rom = new twRomWrap(g)
+    val rom = new twRom(g)
     rom.io.twBus := Delay(io.twBus, (g.DecodeLatency + g.DatDeMuxLatency - g.romMuxLatency)).addAttribute("srl_style", "srl")
   }
 
