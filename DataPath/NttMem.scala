@@ -54,7 +54,7 @@ case class bram(width: Int = 24, addrWidth: Int = 7, depth: Int = 128) extends B
   addRTLPath("/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/bram.v")
 }
 
-case class twRom(g: NttCfg2414) extends Component {
+case class twRom(g: NttCfgParam) extends Component {
   this.setDefinitionName(s"twRom${g.nttPoint}p${g.paraNum}")
   val io = new Bundle {
     val twBus = slave Flow twPayload(
@@ -64,11 +64,6 @@ case class twRom(g: NttCfg2414) extends Component {
     )
     val twData = out Vec (UInt(g.width bits), g.paraNum)
   }
-
-//  val tw = g.twCompress.map(B(_, g.twWidth bits))
-//  val tw128 = g.twCompress128.map(B(_, g.twWidth bits))
-//  val tw256 = g.twCompress256.map(B(_, g.twWidth bits))
-//  val tw4096 = g.twCompress4096.map(B(_, g.twWidth bits))
 
   val rom = Mem(
     Bits(g.twWidth bits),
@@ -87,20 +82,20 @@ case class twRom(g: NttCfg2414) extends Component {
 }
 object twRomGenV extends App {
   SpinalConfig(mode = Verilog, targetDirectory = "NttOpt/rtl/DataPath/rom").generate(
-    new twRom(NttCfg2414(nttPoint = 4096, paraNum = 8))
+    new twRom(NttCfgParam(nttPoint = 4096, paraNum = 8))
   )
 }
 
-case class memBank(g: NttCfg2414) extends Component {
+case class memBank(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val memIf = Array.fill(g.BI)(slave(myRamIF(config = myRamConfig(g.width, g.BankAddrWidth))))
   }
-  val memArray = Array.fill(g.BI)(new DataMem(g.width, g.BankAddrWidth, g.ramLatency, useIP = g.useBramIP))
+  val memArray = Array.fill(g.BI)(new DataMem(g.width, g.BankAddrWidth, g.Arbit.ramLatency, useIP = g.useBramIP))
   io.memIf.zip(memArray.map(_.io.memIf)).foreach { case (t, t1) => t >> t1 }
 }
 
 object memBankGenV extends App {
-  SpinalConfig(mode = Verilog, targetDirectory = "./rtl/Ntt/memBank").generate(new memBank(NttCfg2414()))
+  SpinalConfig(mode = Verilog, targetDirectory = "./rtl/Ntt/memBank").generate(new memBank(NttCfgParam()))
 }
 
 object MemBankVivadoFlow extends App {

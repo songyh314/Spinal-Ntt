@@ -1,6 +1,6 @@
 package Ntt.CTRL
 
-import Ntt.NttCfg.NttCfg2414
+import Ntt.NttCfg.NttCfgParam
 import spinal.core._
 import spinal.core.sim._
 import spinal.lib._
@@ -8,7 +8,7 @@ import spinal.lib.eda.bench.Rtl
 import spinal.lib.eda.xilinx.VivadoFlow
 import spinal.lib.fsm.{State, StateMachine}
 
-case class writeBackCtrl(g: NttCfg2414) extends Component {
+case class writeBackCtrl(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val wctrlStart = in Bool ()
     val isNtt = in Bool ()
@@ -106,7 +106,7 @@ object writeBackCtrlGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/CtrlPath/",
     genLineComments = true
-  ).generate(new writeBackCtrl(NttCfg2414(paraNum = 4, debug = false)))
+  ).generate(new writeBackCtrl(NttCfgParam(paraNum = 4, debug = false)))
 }
 object writeBackCtrlVivadoFlow extends App {
   val workspace = "./vivado_prj/Ntt/Ctrl/writeBackCtrl"
@@ -125,7 +125,7 @@ object writeBackCtrlVivadoFlow extends App {
 
 object writeBackCtrlSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new writeBackCtrl(NttCfg2414(nttPoint = 128, paraNum = 4)))
+  val dut = SimConfig.withXSim.withWave.compile(new writeBackCtrl(NttCfgParam(nttPoint = 128, paraNum = 4)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)

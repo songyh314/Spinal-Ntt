@@ -1,5 +1,5 @@
 package Ntt.DataPath
-import Ntt.NttCfg.NttCfg2414
+import Ntt.NttCfg.NttCfgParam
 import myTools.StreamRenameUtil
 import spinal.core._
 import spinal.core.sim._
@@ -11,7 +11,7 @@ import Ntt.CTRL._
 import spinal.lib.eda.bench.Rtl
 import spinal.lib.eda.xilinx.VivadoFlow
 
-case class CtrlDecodeUnion(g: NttCfg2414) extends Component {
+case class CtrlDecodeUnion(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val start = in Bool ()
     val isNtt = in Bool ()
@@ -28,7 +28,7 @@ case class CtrlDecodeUnion(g: NttCfg2414) extends Component {
 
 object CtrlDecodeUnionSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new CtrlDecodeUnion(NttCfg2414(nttPoint = 128, paraNum = 8)))
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new CtrlDecodeUnion(NttCfgParam(nttPoint = 128, paraNum = 8)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)
@@ -52,7 +52,7 @@ object CtrlDecodeUnionSim extends App {
   }
 }
 
-case class ctrl_memForwardCtrl_union(g:NttCfg2414) extends Component {
+case class ctrl_memForwardCtrl_union(g:NttCfgParam) extends Component {
   val io = new Bundle {
     val start = in Bool ()
     val isNtt = in Bool ()
@@ -83,7 +83,7 @@ case class ctrl_memForwardCtrl_union(g:NttCfg2414) extends Component {
 
 object ctrl_memForwardCtrl_unionSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrl_memForwardCtrl_union(NttCfg2414(nttPoint = 128, paraNum = 8)))
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrl_memForwardCtrl_union(NttCfgParam(nttPoint = 128, paraNum = 8)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)
@@ -130,7 +130,7 @@ object ctrl_memForwardCtrl_unionSim extends App {
 }
 
 
-case class ctrlpath_datapath_union(g:NttCfg2414) extends Component {
+case class ctrlpath_datapath_union(g:NttCfgParam) extends Component {
   val io = new Bundle{
     val start = in Bool ()
     val idle = out Bool ()
@@ -165,7 +165,7 @@ case class ctrlpath_datapath_union(g:NttCfg2414) extends Component {
 
 object ctrlpath_datapath_unionSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrlpath_datapath_union(NttCfg2414(nttPoint = 128,paraNum = 4)))
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrlpath_datapath_union(NttCfgParam(nttPoint = 128,paraNum = 4)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)

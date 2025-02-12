@@ -14,7 +14,7 @@ import myRam._
 import java.io.PrintWriter
 import scala.collection.mutable.ArrayBuffer
 
-case class CtrlMemTop(g: NttCfg2414) extends Component {
+case class CtrlMemTop(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val start = in Bool ()
     val idle = out Bool ()
@@ -47,7 +47,7 @@ case class CtrlMemTop(g: NttCfg2414) extends Component {
   io.NttPayload.zip(dut.io.NttPayload).foreach { case (t1, t2) => t1 := t2 }
 }
 
-case class NttTop(g: NttCfg2414, debug: Boolean = false) extends Component {
+case class NttTop(g: NttCfgParam, debug: Boolean = false) extends Component {
   val io = new Bundle {
     val start = in Bool ()
 
@@ -75,8 +75,8 @@ case class NttTop(g: NttCfg2414, debug: Boolean = false) extends Component {
   io.outsideRdDataArray := ctrlMem.io.outsideRdDataArray
   ctrlMem.io.outsideWrDataArray := io.outsideWrDataArray
   bfuArray.io.isNtt := io.ctrl.isNtt
-  bfuArray.io.dataIn.toSeq.zip(ctrlMem.io.NttPayload.toSeq).foreach { case (t1, t2) => t1 := RegNext(t2) }
-  ctrlMem.io.NttWriteBack.toSeq.zip(bfuArray.io.dataOut.toSeq).foreach { case (t1, t2) => t1 := RegNext(t2) }
+  bfuArray.io.dataIn.toSeq.zip(ctrlMem.io.NttPayload.toSeq).foreach { case (t1, t2) => t1 := (t2) }
+  ctrlMem.io.NttWriteBack.toSeq.zip(bfuArray.io.dataOut.toSeq).foreach { case (t1, t2) => t1 := (t2) }
   if (g.nttSimPublic) {
     io.bfuOut.toSeq.zip(bfuArray.io.dataOut.toSeq).foreach { case (t1, t2) => t1 := t2 }
     io.bfuIn.toSeq.zip(ctrlMem.io.NttPayload.toSeq).foreach { case (t1, t2) => t1 := t2 }
@@ -91,7 +91,7 @@ object NttTopSim extends App {
     .workspacePath("./NttOpt/sim/")
     .withXSimSourcesPaths(path, path)
     .withWave
-    .compile(new NttTop(NttCfg2414(nttPoint = 1024, paraNum = 4), debug = false))
+    .compile(new NttTop(NttCfgParam(nttPoint = 1024, paraNum = 4), debug = false))
   dut.doSim { dut =>
     import dut._
     SimTimeout(4000 * period)
@@ -286,43 +286,43 @@ object NttTopGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/NttTop1",
     genLineComments = true
-  ).generate(new NttTop(NttCfg2414(nttPoint = 4096, paraNum = 8)))
+  ).generate(new NttTop(NttCfgParam(P= PrimeCfg(14,12),Bfu = BfuParamCfg(14,"9eg"),nttPoint = 1024, paraNum = 4)))
 }
 
 object NttTopVivadoFlow extends App {
-  val g = NttCfg2414()
+  val g = NttCfgParam(P= PrimeCfg(64,32),Bfu = BfuParamCfg(64,"v7"),nttPoint = 4096, paraNum = 8)
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/NttTop1",
+    genLineComments = true
+  ).generate(new NttTop(g))
   val useIp = false
   val workspace = "NttOpt/fpga/NttTop"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
-//  val family = "Zynq UltraScale+ MPSoCS"
-//  val device = "xczu9eg-ffvb1156-2-i"
-  val family = "Virtex 7"
-  val device = "xc7vx485tffg1157-1"
+  val family = g.Bfu.device match {
+    case "v7" => "Virtex 7"
+    case "9eg" => "Zynq UltraScale+ MPSoCS"
+  }
+  val device = g.Bfu.device match {
+    case "9eg" => "xczu9eg-ffvb1156-2-i"
+    case "v7" => "xc7vx485tffg1157-1"
+  }
+
   val frequency = 300 MHz
   val cpu = 16
   val useWrapRom = false
-//  if (device == "xczu9eg-ffvb1156-2-i") {
-//    val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
-//  } else if (device == "xc7vx485tffg1157-1") {
-//    val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/V7/mult_gen_0.xcix"
-//  }
-
-  val xcix = if (device == "xczu9eg-ffvb1156-2-i") {
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
-  } else if (device == "xc7vx485tffg1157-1") {
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/V7/mult_gen_0.xcix"
-  } else { null }
+  val xcix = g.Bfu.pathMultIP
 
   val paths = if (useWrapRom) {
     Seq(
       "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop.v",
-      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v",
       g.twFilePath
     )
   } else {
     Seq(
       "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop.v",
-      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v",
       "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop.v_toplevel_ctrlMem_dut_tw_rom_rom.bin"
     )
   }

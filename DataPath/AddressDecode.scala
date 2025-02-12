@@ -1,5 +1,5 @@
 package Ntt.DataPath
-import Ntt.NttCfg.NttCfg2414
+import Ntt.NttCfg.NttCfgParam
 import myTools.StreamRenameUtil
 import spinal.core._
 import spinal.core.sim._
@@ -16,7 +16,7 @@ case class DecodeBus(idx: Int, addr: Int) extends Bundle {
   val BankIdx = UInt(idx bits)
   val BankAddr = UInt(addr bits)
 }
-case class DecodeUnit(g: NttCfg2414) extends Component {
+case class DecodeUnit(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val unitAddrOri = in UInt (g.Log2NttPoints bits)
     val unitBankIdx = out UInt (g.BankIndexWidth bits)
@@ -35,14 +35,14 @@ case class DecodeUnit(g: NttCfg2414) extends Component {
   io.unitBankIdx := bankidx
 }
 object DecodeUnit {
-  def apply(addr: UInt, config: NttCfg2414): DecodeUnit = {
+  def apply(addr: UInt, config: NttCfgParam): DecodeUnit = {
     val uDecode = new DecodeUnit(config)
     uDecode.io.unitAddrOri := addr
     uDecode
   }
 }
 
-case class AddrDecode(g: NttCfg2414) extends Component {
+case class AddrDecode(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val addrOri = in Vec (UInt(g.Log2NttPoints bits), g.BI)
     val BankBus = out Vec (DecodeBus(idx = g.BankIndexWidth, addr = g.BankAddrWidth), g.BI)
@@ -57,7 +57,7 @@ case class AddrDecode(g: NttCfg2414) extends Component {
   }
 }
 object AddrDecode {
-  def apply(dataIn: Vec[UInt], config: NttCfg2414): Vec[DecodeBus] = {
+  def apply(dataIn: Vec[UInt], config: NttCfgParam): Vec[DecodeBus] = {
     val uAddrDecode = new AddrDecode(config)
     uAddrDecode.io.addrOri := dataIn
     uAddrDecode.io.BankBus
@@ -70,10 +70,10 @@ object AddrDecodeGenV extends App {
     nameWhenByFile = false,
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/DataPath"
-  ).generate(new AddrDecode(NttCfg2414()))
+  ).generate(new AddrDecode(NttCfgParam()))
 }
 
-case class idxMux(g: NttCfg2414) extends Component {
+case class idxMux(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val BankIndex = in Vec (UInt(g.BankIndexWidth bits), g.BI)
     val decodeIdx = out Vec (UInt(g.BankIndexWidth bits), g.BI)
@@ -94,7 +94,7 @@ case class idxMux(g: NttCfg2414) extends Component {
   io.decodeIdx := dec
 }
 object idxMux {
-  def apply(dataIn: Vec[UInt], config: NttCfg2414): idxMux = {
+  def apply(dataIn: Vec[UInt], config: NttCfgParam): idxMux = {
     val uidxMux = new idxMux(config)
     uidxMux.io.BankIndex := dataIn
     uidxMux
@@ -102,7 +102,7 @@ object idxMux {
 }
 
 
-case class writebackMux(g: NttCfg2414) extends Component {
+case class writebackMux(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val dataIn = in Vec (Bits(g.width bits), g.BI)
     val sel = in Vec (UInt(g.BankIndexWidth bits), g.BI)
@@ -119,7 +119,7 @@ object writebackMuxGenV extends App {
     nameWhenByFile = false,
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/DataPath"
-  ).generate(new writebackMux(NttCfg2414()))
+  ).generate(new writebackMux(NttCfgParam()))
 }
 object writebackMuxVivadoFlow extends App {
 
@@ -139,7 +139,7 @@ object writebackMuxVivadoFlow extends App {
   val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
   println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
 }
-case class AddrMux(g: NttCfg2414) extends Component {
+case class AddrMux(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val BankBus = in Vec (DecodeBus(idx = g.BankIndexWidth, addr = g.BankAddrWidth), g.BI)
     val AddrBus = out Vec (UInt(g.BankAddrWidth bits), g.BI)
@@ -188,7 +188,7 @@ case class reOrder(idxWidth: Int, dataWidth: Int, addrWidth: Int, n: Int, useDat
 //对外部读取地址进行译码,输出mem的接口数据
 //*mem读出的数据仍需要过一遍mux进行重排
 //对外部输入数据的地址和数据进行译码和重排
-case class PreCal(g: NttCfg2414) extends Component {
+case class PreCal(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val oriAddr = in Vec (UInt(log2Up(g.nttPoint) bits), g.BI)
     val dataIn = in Vec (Bits(g.width bits), g.BI)
@@ -201,7 +201,7 @@ case class PreCal(g: NttCfg2414) extends Component {
 
   uAddrDecode.io.addrOri := io.oriAddr
   val addr_dec = uAddrDecode.io.BankBus
-  val datainDelay = Delay(io.dataIn, g.DecodeCalLatency)
+  val datainDelay = Delay(io.dataIn, g.Arbit.DecodeCalLatency)
 
   val reorder = new Area {
     val clusterAddr = Vec(for (i <- 0 until g.BI) yield { addr_dec(i).BankAddr })
@@ -221,7 +221,7 @@ case class PreCal(g: NttCfg2414) extends Component {
   }
 }
 
-case class memPreCal(g: NttCfg2414, useData: Boolean) extends Component {
+case class memPreCal(g: NttCfgParam, useData: Boolean) extends Component {
   val io = new Bundle {
     val oriAddr = in Vec (UInt(log2Up(g.nttPoint) bits), g.BI)
     val dataIn = if (useData) { in Vec (Bits(g.width bits), g.BI) }
@@ -257,7 +257,7 @@ object memPreCalGenV extends App {
     nameWhenByFile = false,
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/DataPath"
-  ).generate(new memPreCal(NttCfg2414(), true))
+  ).generate(new memPreCal(NttCfgParam(), true))
 }
 object reOrderGenV extends App {
   SpinalConfig(
@@ -290,7 +290,7 @@ object DataDeMux {
     dut.io.DataDeMux
   }
 }
-case class WriteBackArbit(g: NttCfg2414) extends Component {
+case class WriteBackArbit(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val dataIn = in Vec (UInt(g.width bits), g.BI)
     val idxIn = in Vec (UInt(g.BankIndexWidth bits), g.BI)
@@ -303,7 +303,7 @@ case class WriteBackArbit(g: NttCfg2414) extends Component {
   io.dataOut.zip(io.idxIn).foreach { case (t1, t2) => t1 := DeMux(t2) }
 }
 object WriteBackArbit {
-  def apply(g: NttCfg2414, dataIn: Array[Flow[DataPayload]], idx: Vec[UInt]): WriteBackArbit = {
+  def apply(g: NttCfgParam, dataIn: Array[Flow[DataPayload]], idx: Vec[UInt]): WriteBackArbit = {
     val WriteBackPayload = Vec(dataIn.flatMap { item => Seq(item.payload.A, item.payload.B) }.toSeq)
     val dut = new WriteBackArbit(g)
     dut.io.dataIn := WriteBackPayload; dut.io.idxIn := idx
@@ -316,7 +316,7 @@ object WriteBackArbitGenV extends App {
     nameWhenByFile = false,
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/DataPath"
-  ).generate(new WriteBackArbit(NttCfg2414()))
+  ).generate(new WriteBackArbit(NttCfgParam()))
 }
 object WriteBackArbitVivadoFlow extends App {
 
@@ -337,7 +337,7 @@ object WriteBackArbitVivadoFlow extends App {
   println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
 }
 
-case class rdAddrMux2(g: NttCfg2414) extends Component {
+case class rdAddrMux2(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val BankBus = in Vec (DecodeBus(idx = g.BankIndexWidth, addr = g.BankAddrWidth), g.BI)
     val RdAddrBus = out Vec (UInt(g.BankAddrWidth bits), g.BI)
@@ -365,7 +365,7 @@ case class rdAddrMux2(g: NttCfg2414) extends Component {
 
 object DecodeUnitSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.compile(new DecodeUnit(NttCfg2414(nttPoint = 128)))
+  val dut = SimConfig.withXSim.withWave.compile(new DecodeUnit(NttCfgParam(nttPoint = 128)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(1000 * period)
@@ -436,7 +436,7 @@ object AddrMuxVivadoFlow2 extends App {
   println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
 }
 
-case class unitMux(g: NttCfg2414) extends Component {
+case class unitMux(g: NttCfgParam) extends Component {
   val io = new Bundle {
     //    val BankBus = Array.fill(g.BI)(slave Flow DecodeBus(idx = g.BankIndexWidth, addr = g.BankAddrWidth))
     val idx = in UInt (g.BankIndexWidth bits)
@@ -449,7 +449,7 @@ case class unitMux(g: NttCfg2414) extends Component {
   val find = clusterIdx.sFindFirst(_ === io.idx)
   io.decAddr := RegNext(clusterAddr(find._2))
 }
-case class unitMux2(g: NttCfg2414) extends Component {
+case class unitMux2(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val idx = in UInt (g.BankIndexWidth bits)
     val BankBus = in Vec (DecodeBus(idx = g.BankIndexWidth, addr = g.BankAddrWidth), g.BI)
@@ -460,7 +460,7 @@ case class unitMux2(g: NttCfg2414) extends Component {
   val onehot = Vec(io.idx, g.BI).zip(io.BankBus).map { case (t1, t2) => t1 === t2.BankIdx }
   io.decAddr := RegNext(MuxOH(onehot, clusterAddr))
 }
-case class unitMux3(g: NttCfg2414) extends Component {
+case class unitMux3(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val BankBus = in Vec (DecodeBus(idx = g.BankIndexWidth, addr = g.BankAddrWidth), g.BI)
     val decAddr = out Vec (UInt(g.BankAddrWidth bits), g.BI)
@@ -481,7 +481,7 @@ case class unitMux3(g: NttCfg2414) extends Component {
     )
   )
 }
-case class Shuffle(g: NttCfg2414) extends Component {
+case class Shuffle(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val BankBus = slave Flow Vec(DecodeBus(idx = g.BankIndexWidth, addr = g.BankAddrWidth), g.BI)
     val decAddr = master Flow Vec(UInt(g.BankAddrWidth bits), g.BI)

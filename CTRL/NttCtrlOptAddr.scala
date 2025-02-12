@@ -11,7 +11,7 @@ import spinal.lib.eda.xilinx.VivadoFlow
 import spinal.lib.fsm._
 
 
-case class CtrlOptAddr(g: NttCfg2414) extends Component {
+case class CtrlOptAddr(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val start = in Bool ()
     val isNtt = in Bool ()
@@ -138,21 +138,12 @@ case class CtrlOptAddr(g: NttCfg2414) extends Component {
 
   val flatIdxSeq = Vec((ins0_Lsb.zip(ins1_Lsb)).flatMap { case (t1, t2) => Seq(t1.asUInt, t2.asUInt) })
   io.idle := fsm.isActive(fsm.IDLE)
-  io.RdAddrOri.payload := Vec(ins0_Msb.asUInt,ins1_Msb.asUInt)
-  io.RdAddrOri.valid := fsm.isActive(fsm.LOOP)
-  io.RdLsbOri.payload := flatIdxSeq
-  io.RdLsbOri.valid := fsm.isActive(fsm.LOOP)
-//  if (g.debug) {
-//    val uDec = AddrDecode(g)
-//    uDec.io.addrOri := io.RdAddrOri.payload
-//    val probe = uDec.io.BankBus.simPublic()
-//  }
-
-  io.TwBus.payload.twAddr := twAddr.asUInt
-  //  io.TwBus.payload.twAddr := Delay(twAddr.asUInt,g.DecodeLatency)
-  io.TwBus.payload.twMux.zip(twMuxArray.toSeq).foreach { case (t1, t2) => t1 := t2.io.twMuxUnit }
-  //  io.TwBus.payload.twMux.zip(twMuxArray.toSeq).foreach { case (t1, t2) => t1 := Delay(t2.io.twMuxUnit,g.DecodeLatency) }
-  io.TwBus.valid := fsm.isActive(fsm.LOOP)
-  //  io.TwBus.valid := Delay(fsm.isActive(fsm.LOOP),g.DecodeLatency)
+  io.RdAddrOri.payload      := RegNext(Vec(ins0_Msb.asUInt,ins1_Msb.asUInt))
+  io.RdAddrOri.valid        := RegNext(fsm.isActive(fsm.LOOP))
+  io.RdLsbOri.payload       := RegNext(flatIdxSeq)
+  io.RdLsbOri.valid         := RegNext(fsm.isActive(fsm.LOOP))
+  io.TwBus.payload.twAddr   := RegNext(twAddr.asUInt)
+  io.TwBus.valid            := RegNext(fsm.isActive(fsm.LOOP))
+  io.TwBus.payload.twMux.zip(twMuxArray.toSeq).foreach { case (t1, t2) => t1 := RegNext(t2.io.twMuxUnit) }
 }
 

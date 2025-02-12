@@ -18,11 +18,11 @@ object DataPathTopGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new DataPathTop(NttCfg2414(paraNum = 8)))
+  ).generate(new DataPathTop(NttCfgParam(paraNum = 8)))
 }
 
 object DataPathTopVivadoFlow extends App {
-  val g = NttCfg2414(paraNum = 8)
+  val g = NttCfgParam(paraNum = 8)
   val useIp = false
   val workspace = "NttOpt/fpga/DataPathTop"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
@@ -63,7 +63,7 @@ object DataPathTopVivadoFlow extends App {
 
 
 object NttTopVivadoFlow extends App {
-  val g = NttCfg2414()
+  val g = NttCfgParam()
   val useIp = false
   val workspace = "NttOpt/fpga/DataPath/shuffleOpt"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"

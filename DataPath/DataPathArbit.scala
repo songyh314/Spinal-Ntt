@@ -163,7 +163,7 @@ object sfMuxp4ch0_4Genv extends App {
   ).generate(new sfMuxp4ch0_4(3, 0, Seq(0, 1, 4)))
 }
 
-case class idxDecodeUnitOpt(g: NttCfg2414) extends Component {
+case class idxDecodeUnitOpt(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val addrOri = in UInt (g.BankAddrWidth bits)
     val idxOri = in UInt (g.BankIndexWidth bits)
@@ -177,7 +177,7 @@ case class idxDecodeUnitOpt(g: NttCfg2414) extends Component {
   io.idxDec := Cat(sn, io.idxOri(0, g.BankIndexWidth - 1 bits)).asUInt
 }
 object idxDecodeUnitOpt {
-  def apply(addr: UInt, idx: UInt, g: NttCfg2414): UInt = {
+  def apply(addr: UInt, idx: UInt, g: NttCfgParam): UInt = {
     val dut = new idxDecodeUnitOpt(g)
     dut.io.addrOri := addr
     dut.io.idxOri := idx
@@ -185,7 +185,7 @@ object idxDecodeUnitOpt {
   }
 }
 
-case class shuffleOpt(g: NttCfg2414) extends Component {
+case class shuffleOpt(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val addrOri = in Vec (UInt(g.BankAddrWidth bits), g.radix)
     val idxOri = in Vec (UInt(g.BankIndexWidth bits), g.BI)
@@ -299,10 +299,10 @@ object shuffleOptGenv extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new shuffleOpt(NttCfg2414()))
+  ).generate(new shuffleOpt(NttCfgParam()))
 }
 
-case class idxDecodeUnit(g: NttCfg2414) extends Component {
+case class idxDecodeUnit(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val addrOri = in UInt (g.BankAddrWidth bits)
     val idxOri = in UInt (g.BankIndexWidth bits)
@@ -316,7 +316,7 @@ case class idxDecodeUnit(g: NttCfg2414) extends Component {
   io.idxDec := bankIdx
 }
 object idxDecodeUnit {
-  def apply(addr: UInt, idx: UInt, g: NttCfg2414): UInt = {
+  def apply(addr: UInt, idx: UInt, g: NttCfgParam): UInt = {
     val dut = new idxDecodeUnit(g)
     dut.io.addrOri := addr
     dut.io.idxOri := idx
@@ -324,7 +324,7 @@ object idxDecodeUnit {
   }
 }
 
-case class idxDecode(g: NttCfg2414) extends Component {
+case class idxDecode(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val addrOri = in Vec (UInt(g.BankAddrWidth bits), g.radix)
     val idxOri = in Vec (UInt(g.BankIndexWidth bits), g.BI)
@@ -341,7 +341,7 @@ case class idxDecode(g: NttCfg2414) extends Component {
   }
 }
 object idxDecode {
-  def apply(addr: Vec[UInt], idx: Vec[UInt], g: NttCfg2414): Vec[UInt] = {
+  def apply(addr: Vec[UInt], idx: Vec[UInt], g: NttCfgParam): Vec[UInt] = {
     val dut = new idxDecode(g)
     dut.io.addrOri := addr
     dut.io.idxOri := idx
@@ -355,10 +355,10 @@ object idxDecodeGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new idxDecode(NttCfg2414()))
+  ).generate(new idxDecode(NttCfgParam()))
 }
 
-case class memInMux(g: NttCfg2414) extends Component {
+case class memInMux(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val dataIn = in Vec (Bits(g.width bits), g.BI)
     val idxIn = in Vec (UInt(g.BankIndexWidth bits), g.BI)
@@ -486,7 +486,7 @@ case class memInMux(g: NttCfg2414) extends Component {
 
 }
 object memInMux {
-  def apply(dataIn: Vec[Bits], idx: Vec[UInt], g: NttCfg2414): Vec[Bits] = {
+  def apply(dataIn: Vec[Bits], idx: Vec[UInt], g: NttCfgParam): Vec[Bits] = {
     val dut = new memInMux(g)
     dut.io.dataIn := dataIn
     dut.io.idxIn := idx
@@ -500,10 +500,10 @@ object memInMuxGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new memInMux(NttCfg2414()))
+  ).generate(new memInMux(NttCfgParam()))
 }
 
-case class memInArb(g: NttCfg2414) extends Component {
+case class memInArb(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val addrOri = in Vec (UInt(g.BankAddrWidth bits), g.radix)
     val idxOri = in Vec (UInt(g.BankIndexWidth bits), g.BI)
@@ -540,10 +540,10 @@ object memInArbGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new memInArb(NttCfg2414()))
+  ).generate(new memInArb(NttCfgParam()))
 }
 
-case class memWritebackArb(g: NttCfg2414) extends Component {
+case class memWritebackArb(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val isNtt = in Bool ()
     val dataWb = in Vec (Bits(g.width bits), g.BI) // form BFU
@@ -556,11 +556,11 @@ case class memWritebackArb(g: NttCfg2414) extends Component {
   }
 
   val idxDelaySt1 =
-    Delay(io.idxWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay)
+    Delay(io.idxWb, g.BfuNttDelay + g.Arbit.ramLatency + g.Arbit.DatDeMuxLatency + g.BfuRegisterIoDelay)
       .addAttribute("srl_style", "srl")
   val idxDelaySt2 = Delay(idxDelaySt1, g.BfuInttDelay - g.BfuNttDelay)
   val addrDelaySt1 =
-    Delay(io.addrWb, g.BfuNttDelay + g.ramLatency + g.DatDeMuxLatency + g.BfuRegisterIoDelay)
+    Delay(io.addrWb, g.BfuNttDelay + g.Arbit.ramLatency + g.Arbit.DatDeMuxLatency + g.BfuRegisterIoDelay)
       .addAttribute("srl_style", "srl")
   val addrDelaySt2 = Delay(addrDelaySt1, g.BfuInttDelay - g.BfuNttDelay)
 
@@ -578,10 +578,10 @@ object memWritebackArbGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new memWritebackArb(NttCfg2414()))
+  ).generate(new memWritebackArb(NttCfgParam()))
 }
 
-case class memOutArb(g: NttCfg2414) extends Component {
+case class memOutArb(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val dataMem = in Vec (Bits(g.width bits), g.BI)
     val idx = in Vec (UInt(g.BankIndexWidth bits), g.BI)
@@ -715,7 +715,7 @@ case class memOutArb(g: NttCfg2414) extends Component {
   } else { null }
 }
 object memOutArb {
-  def apply(dataIn: Vec[Bits], idx: Vec[UInt], g: NttCfg2414): Vec[Bits] = {
+  def apply(dataIn: Vec[Bits], idx: Vec[UInt], g: NttCfgParam): Vec[Bits] = {
     val dut = new memOutArb(g)
     dut.io.dataMem := dataIn
     dut.io.idx := idx
@@ -730,10 +730,10 @@ object memOutArbGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new memOutArb(NttCfg2414()))
+  ).generate(new memOutArb(NttCfgParam()))
 }
 
-case class memForwardCtrl(g: NttCfg2414) extends Component {
+case class memForwardCtrl(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val ctrl = in(CtrlBus())
     val outsideAddrOri = slave Flow Vec(UInt(g.BankAddrWidth bits), g.radix)
@@ -777,11 +777,11 @@ case class memForwardCtrl(g: NttCfg2414) extends Component {
     )
   }
 
-  io.MemIfRe := io.ctrl.isCal ? { Delay(io.bfuRdAddrOri.valid, g.DecodeLatency) } | {
-    io.ctrl.isOutSideRead ? Delay(io.outsideAddrOri.valid, g.DecodeLatency) | False
+  io.MemIfRe := io.ctrl.isCal ? { Delay(io.bfuRdAddrOri.valid, g.Arbit.DecodeLatency) } | {
+    io.ctrl.isOutSideRead ? Delay(io.outsideAddrOri.valid, g.Arbit.DecodeLatency) | False
   }
-  io.MemIfWe := io.ctrl.isCal ? Delay(io.NttWriteBack.valid, g.DecodeMuxRegLatency) | {
-    io.ctrl.isOutSideWrite ? Delay(io.outsideAddrOri.valid, g.DecodeLatency) | False
+  io.MemIfWe := io.ctrl.isCal ? Delay(io.NttWriteBack.valid, g.Arbit.DecodeMuxRegLatency) | {
+    io.ctrl.isOutSideWrite ? Delay(io.outsideAddrOri.valid, g.Arbit.DecodeLatency) | False
   }
 
   io.MemIfWrData := RegNext(io.ctrl.isCal ? memWbArb.io.dataWbMem | memInArb.io.dataMem)
@@ -793,10 +793,10 @@ object memForwardCtrlGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new memForwardCtrl(NttCfg2414()))
+  ).generate(new memForwardCtrl(NttCfgParam()))
 }
 
-case class memBackwardCtrl(g: NttCfg2414) extends Component {
+case class memBackwardCtrl(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val ctrl = in(CtrlBus())
     val memIfRdData = slave Flow Vec(Bits(g.width bits), g.BI)
@@ -817,10 +817,10 @@ object memBackwardCtrlGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new memBackwardCtrl(NttCfg2414()))
+  ).generate(new memBackwardCtrl(NttCfgParam()))
 }
 
-case class DataPathTop(g: NttCfg2414) extends Component {
+case class DataPathTop(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val ctrl = in(CtrlBus())
 
@@ -842,7 +842,7 @@ case class DataPathTop(g: NttCfg2414) extends Component {
 
   val tw = new Area {
     val rom = new twRom(g)
-    rom.io.twBus := Delay(io.twBus, (g.DecodeLatency + g.DatDeMuxLatency - g.romMuxLatency)).addAttribute("srl_style", "srl")
+    rom.io.twBus := Delay(io.twBus, (g.Arbit.DecodeLatency + g.Arbit.DatDeMuxLatency - g.Arbit.romMuxLatency)).addAttribute("srl_style", "srl")
   }
 
   val fc = memForwardCtrl(g)
@@ -863,8 +863,8 @@ case class DataPathTop(g: NttCfg2414) extends Component {
     interface.wData := data; interface.wAddr := addr; interface.we := fc.io.MemIfWe
   }
 
-  bc.io.memIfRdData.valid := Delay(fc.io.MemIfRe, g.ramLatency)
-  val idxTrans = Delay(fc.io.bankIdxTrans, g.ramLatency)
+  bc.io.memIfRdData.valid := Delay(fc.io.MemIfRe, g.Arbit.ramLatency)
+  val idxTrans = Delay(fc.io.bankIdxTrans, g.Arbit.ramLatency)
   bc.io.ctrl := io.ctrl
   bc.io.idx := idxTrans
   io.outsideRdDataArray := bc.io.outsideRdDataArray

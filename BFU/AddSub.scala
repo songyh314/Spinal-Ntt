@@ -1,6 +1,6 @@
 package Ntt.BFU
 
-import Ntt.NttCfg.{DataPayload, NttCfg2414}
+import Ntt.NttCfg.{DataPayload, NttCfgParam}
 import spinal.core._
 import spinal.core.sim._
 import spinal.lib._
@@ -14,7 +14,7 @@ import scala.util.Random
 //可以扩展module输出Mux,但是两种模式切换时必须空一个周期
 //原因是两种模式Latency不一致,不能无缝切换.实际功能也不需要,故不做扩展
 
-class AddSub(g: NttCfg2414) extends Component {
+class AddSub(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val isRescale = in Bool ()
     val dataIn = slave Flow (DataPayload(g))
@@ -50,7 +50,7 @@ class AddSub(g: NttCfg2414) extends Component {
     val res = RegNextWhen(resTmp, valid && sel)
     res
   }
-  val validLat1 = Delay(io.dataIn.valid,g.AddSubLatencyNtt)
+  val validLat1 = Delay(io.dataIn.valid,g.Bfu.AddSubLatencyNtt)
   val validLat2 = RegNext(validLat1)
 
   addReg := Add_tmp.resized
@@ -60,7 +60,7 @@ class AddSub(g: NttCfg2414) extends Component {
   io.dataOut.valid := io.isRescale ? validLat2 | validLat1
 }
 object AddSub {
-  def apply(dataIn: Flow[DataPayload], mode: Bool, config: NttCfg2414): AddSub = {
+  def apply(dataIn: Flow[DataPayload], mode: Bool, config: NttCfgParam): AddSub = {
     val uAddSub = new AddSub(config)
     uAddSub.io.dataIn := dataIn
     uAddSub.io.isRescale := mode

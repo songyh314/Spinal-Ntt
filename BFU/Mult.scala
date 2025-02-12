@@ -1,6 +1,6 @@
 package Ntt.BFU
 
-import Ntt.NttCfg.{NttCfg2414, multPayload}
+import Ntt.NttCfg.{NttCfgParam, multPayload}
 import spinal.core._
 import spinal.lib._
 import spinal.lib.eda.bench.Rtl
@@ -26,8 +26,45 @@ object mul {
     umul
   }
 }
+case class mulBlackBox(width:Int = 24,device:String = "9eg") extends BlackBox {
+  addGeneric("width",width)
+  val io = new Bundle {
+    val CLK = in Bool ()
+    val A = in UInt  (width bits)
+    val B = in UInt  (width bits)
+    val P = out UInt  (2*width bits)
+  }
+  noIoPrefix()
+  mapClockDomain(clock = io.CLK)
+  setInlineVerilog(s"""
+                      |module mulBlackBox  #(
+                      |   parameter width = $width
+                      |)(
+                      |    input wire [${width-1}:0] A,
+                      |    input wire [${width-1}:0] B,
+                      |    input wire CLK,
+                      |    output wire [${(2*width)-1}:0] P
+                      |);
+                      |mult_w${width}_${device} mul_inst (
+                      |  .CLK(CLK),
+                      |  .A(A),
+                      |  .B(B),
+                      |  .P(P)
+                      |);
+                      |endmodule
+                      |""".stripMargin)
+}
+object mulBlackBox {
+  def apply(A: UInt, B: UInt, g:NttCfgParam): UInt = {
+    val umul = new mulBlackBox(g.width, g.Bfu.device)
+    umul.io.A := A
+    umul.io.B := B
+    umul.io.P
+  }
+}
 
-class xMul(g: NttCfg2414) extends Component {
+class xMul(g: NttCfgParam) extends Component {
+//  this.setDefinitionName(s"mul")
   val io = new Bundle {
     val dataIn = slave Flow(multPayload(g))
 //    val dataA = in UInt (g.width bits)
@@ -39,14 +76,15 @@ class xMul(g: NttCfg2414) extends Component {
   io.dataOut.payload := mul(io.dataIn.data, io.dataIn.tw).io.P
 }
 
-case class Mult(g: NttCfg2414) extends Component {
+case class Mult(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val dataIn = slave Flow (multPayload(g))
     val dataOut = master Flow (UInt(2 * g.width bits))
   }
   if (g.useMulIP == true){
     io.dataOut.valid := Delay(io.dataIn.valid,4)
-    io.dataOut.payload := mul(io.dataIn.data, io.dataIn.tw).io.P
+    io.dataOut.payload := mulBlackBox(io.dataIn.data, io.dataIn.tw,g)
+//    io.dataOut.payload := mul(io.dataIn.data, io.dataIn.tw).io.P
   } else {
     val dataReg = RegNext(io.dataIn.payload.data) init U(0)
     val twReg = RegNext(io.dataIn.payload.tw) init U(0)
@@ -67,7 +105,7 @@ object MultGenVerilog extends App {
     targetDirectory = "./rtl/Ntt/Mult",
     nameWhenByFile = false,
     anonymSignalPrefix = "tmp"
-  ).generate(new xMul(NttCfg2414()))
+  ).generate(new xMul(NttCfgParam()))
 }
 
 object MultVivadoFlow extends App {

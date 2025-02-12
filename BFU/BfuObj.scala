@@ -1,6 +1,6 @@
 package Ntt.BFU
 
-import Ntt.NttCfg.{BfuPayload, DataPayload, NttCfg2414}
+import Ntt.NttCfg.{BfuPayload, DataPayload, NttCfgParam}
 import spinal.core._
 import spinal.core.sim._
 import spinal.lib._
@@ -12,24 +12,24 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
 object BfuGold extends App {
-  val g = NttCfg2414()
+  val g = NttCfgParam()
   val debug = false
   def AddSub(A: BigInt = 0, B: BigInt = 0, isRescale: Boolean): (BigInt, BigInt) = {
-    var addRes = (A + B) % NttCfg2414().Prime
-    var subRes = if (A > B) A - B else (A + NttCfg2414().Prime) - B
+    var addRes = (A + B) % NttCfgParam().Prime
+    var subRes = if (A > B) A - B else (A + NttCfgParam().Prime) - B
     if (isRescale) {
       if (addRes % 2 == 1) {
-        addRes = addRes / 2 + NttCfg2414().HalfPrime
+        addRes = addRes / 2 + NttCfgParam().HalfPrime
       } else { addRes = addRes / 2 }
       if (subRes % 2 == 1) {
-        subRes = subRes / 2 + NttCfg2414().HalfPrime
+        subRes = subRes / 2 + NttCfgParam().HalfPrime
       } else { subRes = subRes / 2 }
     }
     if (debug) println(s"add : $addRes , subu : $subRes")
     (addRes, subRes)
   }
   def ModMult(A: BigInt, B: BigInt): BigInt = {
-    val ret = (A * B) % NttCfg2414().Prime
+    val ret = (A * B) % NttCfgParam().Prime
     if (debug) println(s"modmult res : $ret")
     ret
   }
@@ -47,7 +47,7 @@ object BfuGold extends App {
 case class DrvData(A: BigInt, B: BigInt, TW: BigInt, isNtt: Boolean)
 case class MonData(A: BigInt, B: BigInt)
 
-case class BfuSim() extends Bfu(NttCfg2414()) {
+case class BfuSim() extends Bfu(NttCfgParam()) {
   val drvQueue = mutable.Queue[DrvData]()
   val drvMon = mutable.Queue[DrvData]()
   val refQueue = mutable.Queue[MonData]()
@@ -136,7 +136,7 @@ case class BfuSim() extends Bfu(NttCfg2414()) {
 }
 object BfuGenV extends App {
   SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "./rtl/Ntt/Bfu")
-    .generate(new Bfu(NttCfg2414(), debug = false))
+    .generate(new Bfu(NttCfgParam(), debug = false))
 }
 
 object BfuSimFlow extends App {
@@ -148,7 +148,7 @@ object BfuSimFlow extends App {
   val period = 10
   dut.doSim("test") { dut =>
     import dut._
-    val g = NttCfg2414()
+    val g = NttCfgParam()
     SimTimeout(5000 * period)
     clockDomain.forkStimulus(period)
     simEnvStart()

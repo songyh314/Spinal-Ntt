@@ -1,6 +1,6 @@
 package Ntt.BFU
 
-import Ntt.NttCfg.{DataPayload, NttCfg2414}
+import Ntt.NttCfg.{DataPayload, NttCfgParam}
 import spinal.core._
 import spinal.core.sim._
 import spinal.lib._
@@ -10,15 +10,11 @@ import spinal.lib.eda.xilinx.VivadoFlow
 import scala.collection.mutable
 import scala.util.Random
 
-//isRescale作为控制信号在该模式下的计算全部完成之前不能改变
-//可以扩展module输出Mux,但是两种模式切换时必须空一个周期
-//原因是两种模式Latency不一致,不能无缝切换.实际功能也不需要,故不做扩展
-
 
 case class drvData(A: BigInt = 0, B: BigInt = 0, mode: Boolean = true)
 case class monData(A: BigInt = 0, B: BigInt = 0)
 
-case class AddSubSim(g: NttCfg2414) extends AddSub(NttCfg2414()) {
+case class AddSubSim(g: NttCfgParam) extends AddSub(NttCfgParam()) {
   val drvQueue = mutable.Queue[drvData]()
   val drvMon = mutable.Queue[drvData]()
   val refQueue = mutable.Queue[monData]()
@@ -123,14 +119,14 @@ case class AddSubSim(g: NttCfg2414) extends AddSub(NttCfg2414()) {
 
 object AddSubGenV extends App {
   SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "./rtl/Ntt/Bfu")
-    .generate(new AddSub(NttCfg2414()))
+    .generate(new AddSub(NttCfgParam()))
 }
 
 object AddSubSimFLow extends App {
-  val dut = SimConfig.withXSim.withWave.withXilinxDevice("xczu9eg-ffvb1156-2-i").compile(new AddSubSim(NttCfg2414()))
+  val dut = SimConfig.withXSim.withWave.withXilinxDevice("xczu9eg-ffvb1156-2-i").compile(new AddSubSim(NttCfgParam()))
   val period = 10
   val test = new drvData()
-  val p = NttCfg2414().Prime
+  val p = NttCfgParam().Prime
   //  val p = BigInt(2).pow(24) - BigInt(2).pow(14) + 1
   dut.doSim("test") { dut =>
     import dut._

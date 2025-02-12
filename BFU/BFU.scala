@@ -1,6 +1,6 @@
 package Ntt.BFU
 
-import Ntt.NttCfg.{BfuPayload, DataPayload, NttCfg2414}
+import Ntt.NttCfg.{BfuPayload, DataPayload, NttCfgParam}
 import spinal.core._
 import spinal.core.sim._
 import spinal.lib._
@@ -11,7 +11,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
-case class invTwConvert(g:NttCfg2414) extends Component{
+case class invTwConvert(g:NttCfgParam) extends Component{
   val io = new Bundle{
     val tw = in UInt(g.width bits)
     val invTw = out UInt(g.width bits)
@@ -20,7 +20,7 @@ case class invTwConvert(g:NttCfg2414) extends Component{
   io.invTw := RegNext(tmp)
 }
 
-class Bfu(g: NttCfg2414, debug: Boolean = false) extends Component {
+class Bfu(g: NttCfgParam, debug: Boolean = false) extends Component {
   val io = new Bundle {
     val isNtt = in Bool ()
     val dataIn = slave Flow (BfuPayload(g))
@@ -45,7 +45,7 @@ class Bfu(g: NttCfg2414, debug: Boolean = false) extends Component {
     new Area {
 
       val uAddSub = new AddSub(g)
-      val uModMult = new ModMult(g)
+      val uModMult = new ModMultCluster(g)
       val invTw = genInvTw(io.dataIn.payload.Tw)
       val DelayOutSt1 = Delay(invTw, g.BfuLatencySt1 - 1).addAttribute("SRL_STYLE", "SRL")
       val DelayOutSt2 =
