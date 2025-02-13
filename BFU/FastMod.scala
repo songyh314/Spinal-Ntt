@@ -133,7 +133,9 @@ case class FastMod1412(g: NttCfgParam = NttCfgParam(P = PrimeCfg(14, 12))) exten
   val Fsub = Dslice(1) +^ A(A.getWidth - 1 downto 2) +^ A.msb.asUInt
   val F = (E << g.P.N) - Fsub
   val Freg = RegNext(F)
-  val Cdelay = RegNext(C)
+  val Csub = C._data - g.Prime
+  val Cst2 = (C._data >= g.Prime) ? Csub | C
+  val Cdelay = RegNext(Cst2)
   val Res1_tmp1 = Freg +^ Cdelay - g.Prime
   val Res1_tmp2 = Freg +^ Cdelay
   val Res1_value = (Freg +^ Cdelay >= g.Prime) ? Res1_tmp1 | Res1_tmp2
@@ -167,18 +169,18 @@ case class FastMod6432(g: NttCfgParam) extends Component {
   val sliceData = io.dataIn.payload.subdivideIn(4 slices)
   val st1_res1_tmp = sliceData(2) +^ sliceData(1)
   val st1_res2_tmp = (sliceData(3) -^ sliceData(0) -^ sliceData(1)).asSInt
-  val st1_res1 = RegNextWhen(st1_res1_tmp,io.dataIn.valid)
-  val st1_res2 = RegNextWhen(st1_res2_tmp,io.dataIn.valid)
+  val st1_res1 = RegNextWhen(st1_res1_tmp, io.dataIn.valid)
+  val st1_res2 = RegNextWhen(st1_res2_tmp, io.dataIn.valid)
   val st2_res_tmp = (st1_res1 << g.P.N).asSInt +^ st1_res2
   val st2_res = RegNext(st2_res_tmp)
   val of_flag = st2_res >= g.Prime
   val uf_flag = st2_res < 0
   val st3_of = (st2_res - g.Prime).asUInt.resize(g.width bits)
   val st3_uf = (st2_res + g.Prime).asUInt.resize(g.width bits)
-  val st3_res_tmp = of_flag? (st3_of)|(uf_flag? (st3_uf) | (st2_res.asUInt.resize(g.width bits)))
+  val st3_res_tmp = of_flag ? (st3_of) | (uf_flag ? (st3_uf) | (st2_res.asUInt.resize(g.width bits)))
   val st3_res = RegNext(st3_res_tmp)
   io.dataOut.payload := st3_res
-  io.dataOut.valid := Delay(io.dataIn.valid, LatencyAnalysis(io.dataIn.payload,io.dataOut.payload))
+  io.dataOut.valid := Delay(io.dataIn.valid, LatencyAnalysis(io.dataIn.payload, io.dataOut.payload))
 }
 object FastMod6432 {
   def apply(dataIn: Flow[UInt], g: NttCfgParam): Flow[UInt] = {
@@ -187,4 +189,23 @@ object FastMod6432 {
     val ret = dut.io.dataOut
     ret
   }
+}
+
+case class BarretMod2414(g: NttCfgParam) extends Component {
+  val io = new Bundle {
+    val dataIn = slave Flow (UInt(2 * g.width bits))
+    val dataOut = master Flow (UInt(g.width bits))
+  }
+  val dataReg = RegNextWhen(io.dataIn.payload, io.dataIn.valid)
+  val st1_tmp =
+    ((dataReg << 24) +^ (dataReg << 14) +^ (dataReg << 4) - dataReg).resize(72 bits)
+  val st1_reg = RegNext(st1_tmp(71 downto 48))
+  val dataDelay = Delay(dataReg, g.Bfu.MultLatency + 1).addAttribute("srl_style", "srl_reg")
+  val mulRes = mulBlackBox(st1_reg, g.Prime, g)
+  val st2_sub_tmp = RegNext(dataDelay - mulRes).resize(g.width bits)
+  val st2_sub_tmp_of = RegNext(dataDelay - mulRes - g.Prime).resize(g.width bits)
+  val of = dataDelay - mulRes >= g.Prime
+  val res = RegNext(of ? st2_sub_tmp_of | st2_sub_tmp).resize(g.width bits)
+  io.dataOut.payload := res
+  io.dataOut.valid := Delay(io.dataIn.valid, g.Bfu.MultLatency + 3)
 }

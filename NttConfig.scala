@@ -78,14 +78,15 @@ object NttCfg {
       P: PrimeCfg = PrimeCfg(24, 14),
       nttPoint: Int = 1024,
       paraNum: Int = 4,
-      debug: Boolean = true
+      debug: Boolean = false,
+      nttSimPublic:Boolean = true
   ) {
     val radix = 2
 
     val useBramIP = false
     val useMulIP = true
     val useTwFile = true
-    val nttSimPublic = true
+//    val nttSimPublic = true
 
 //    val AddSubLatencyIntt = Bfu.AddSubLatencyIntt // add&sub + rescale
 //    val AddSubLatencyNtt = Bfu.AddSubLatencyNtt // add&sub
@@ -133,6 +134,17 @@ object NttCfg {
     val twFilePath = s"/PRJ/SpinalHDL-prj/PRJ/py/nwc_ntt_python/data/tw${nttPoint}p${paraNum}q${P.M}_${P.N}.txt"
     val twData: Seq[BigInt] = tools.readData(twFilePath)
     val initTableCompress = tools.wordCat(initTable, paraNum, width)
+
+    val family = Bfu.device match {
+      case "v7" => "Virtex 7"
+      case "9eg" => "Zynq UltraScale+ MPSoCS"
+    }
+    val device = Bfu.device match {
+      case "9eg" => "xczu9eg-ffvb1156-2-i"
+      case "v7" => "xc7vx485tffg1157-2"
+    }
+
+
   }
 
   case class CtrlBus() extends Bundle {

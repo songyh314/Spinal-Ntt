@@ -54,6 +54,8 @@ case class mulBlackBox(width:Int = 24,device:String = "9eg") extends BlackBox {
                       |endmodule
                       |""".stripMargin)
 }
+
+
 object mulBlackBox {
   def apply(A: UInt, B: UInt, g:NttCfgParam): UInt = {
     val umul = new mulBlackBox(g.width, g.Bfu.device)
@@ -82,7 +84,7 @@ case class Mult(g: NttCfgParam) extends Component {
     val dataOut = master Flow (UInt(2 * g.width bits))
   }
   if (g.useMulIP == true){
-    io.dataOut.valid := Delay(io.dataIn.valid,4)
+    io.dataOut.valid := Delay(io.dataIn.valid,g.Bfu.MultLatency)
     io.dataOut.payload := mulBlackBox(io.dataIn.data, io.dataIn.tw,g)
 //    io.dataOut.payload := mul(io.dataIn.data, io.dataIn.tw).io.P
   } else {
@@ -95,7 +97,6 @@ case class Mult(g: NttCfgParam) extends Component {
     io.dataOut.payload := Preg
     io.dataOut.valid := Valid
   }
-
 }
 
 

@@ -15,7 +15,7 @@ case class CtrlDecodeUnion(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val start = in Bool ()
     val isNtt = in Bool ()
-    val idle = out Bool()
+    val idle = out Bool ()
   }
   val ctrl = new CtrlOptAddr(g)
   ctrl.io.isNtt := io.isNtt
@@ -28,7 +28,9 @@ case class CtrlDecodeUnion(g: NttCfgParam) extends Component {
 
 object CtrlDecodeUnionSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new CtrlDecodeUnion(NttCfgParam(nttPoint = 128, paraNum = 8)))
+  val dut = SimConfig.withXSim.withWave
+    .workspacePath("./NttOpt/sim/UnionSim")
+    .compile(new CtrlDecodeUnion(NttCfgParam(nttPoint = 128, paraNum = 8)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)
@@ -52,14 +54,14 @@ object CtrlDecodeUnionSim extends App {
   }
 }
 
-case class ctrl_memForwardCtrl_union(g:NttCfgParam) extends Component {
+case class ctrl_memForwardCtrl_union(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val start = in Bool ()
     val isNtt = in Bool ()
-    val idle = out Bool()
-    val isCal = in Bool()
-    val isOutRead = in Bool()
-    val isOutWrite = in Bool()
+    val idle = out Bool ()
+    val isCal = in Bool ()
+    val isOutRead = in Bool ()
+    val isOutWrite = in Bool ()
 
     val outsideAddrOri = slave Flow Vec(UInt(g.BankAddrWidth bits), g.radix)
     val outsideIdxOri = slave Flow Vec(UInt(g.BankIndexWidth bits), g.BI)
@@ -83,7 +85,9 @@ case class ctrl_memForwardCtrl_union(g:NttCfgParam) extends Component {
 
 object ctrl_memForwardCtrl_unionSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrl_memForwardCtrl_union(NttCfgParam(nttPoint = 128, paraNum = 8)))
+  val dut = SimConfig.withXSim.withWave
+    .workspacePath("./NttOpt/sim/UnionSim")
+    .compile(new ctrl_memForwardCtrl_union(NttCfgParam(nttPoint = 128, paraNum = 8)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)
@@ -113,11 +117,11 @@ object ctrl_memForwardCtrl_unionSim extends App {
     io.isOutRead #= true
     clockDomain.waitSampling(10)
     val seq1 = Seq.range(0, g.BI).map(item => BigInt(item))
-    for (i <- 0 until (g.nttPoint/g.BI)) {
+    for (i <- 0 until (g.nttPoint / g.BI)) {
       io.outsideIdxOri.valid #= true
       io.outsideAddrOri.valid #= true
       io.outsideAddrOri.payload.foreach(item => item #= i)
-      io.outsideIdxOri.payload.zip(seq1).foreach{case(t1,t2) => t1 #= t2}
+      io.outsideIdxOri.payload.zip(seq1).foreach { case (t1, t2) => t1 #= t2 }
       clockDomain.waitSampling()
       io.outsideIdxOri.valid #= false
       io.outsideAddrOri.valid #= false
@@ -125,13 +129,11 @@ object ctrl_memForwardCtrl_unionSim extends App {
     clockDomain.waitSampling(10)
     io.isOutRead #= false
 
-
   }
 }
 
-
-case class ctrlpath_datapath_union(g:NttCfgParam) extends Component {
-  val io = new Bundle{
+case class ctrlpath_datapath_union(g: NttCfgParam) extends Component {
+  val io = new Bundle {
     val start = in Bool ()
     val idle = out Bool ()
     val ctrl = in(CtrlBus())
@@ -159,13 +161,15 @@ case class ctrlpath_datapath_union(g:NttCfgParam) extends Component {
   io.outsideRdDataArray := dut.io.outsideRdDataArray
   dut.io.outsideWrDataArray := io.outsideWrDataArray
 
-  dut.io.NttWriteBack.zip(io.NttWriteBack).foreach{case(t1,t2) => t1 := t2}
-  io.NttPayload.zip(dut.io.NttPayload).foreach{case(t1,t2) => t1 := t2}
+  dut.io.NttWriteBack.zip(io.NttWriteBack).foreach { case (t1, t2) => t1 := t2 }
+  io.NttPayload.zip(dut.io.NttPayload).foreach { case (t1, t2) => t1 := t2 }
 }
 
 object ctrlpath_datapath_unionSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrlpath_datapath_union(NttCfgParam(nttPoint = 128,paraNum = 4)))
+  val dut = SimConfig.withXSim.withWave
+    .workspacePath("./NttOpt/sim/UnionSim")
+    .compile(new ctrlpath_datapath_union(NttCfgParam(nttPoint = 128, paraNum = 4)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)
@@ -188,7 +192,7 @@ object ctrlpath_datapath_unionSim extends App {
       io.outsideIdxOri.valid #= true
       (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
       io.outsideAddrOri.payload.foreach(item => item #= i)
-      io.outsideIdxOri.payload.zip(seq1).foreach{case(t1,t2) => t1 #= t2}
+      io.outsideIdxOri.payload.zip(seq1).foreach { case (t1, t2) => t1 #= t2 }
       clockDomain.waitSampling()
       io.outsideAddrOri.valid #= false
     }
@@ -204,7 +208,7 @@ object ctrlpath_datapath_unionSim extends App {
       io.outsideAddrOri.valid #= true
       io.outsideIdxOri.valid #= true
       io.outsideAddrOri.payload.foreach(item => item #= i)
-      io.outsideIdxOri.payload.zip(seq1).foreach{case(t1,t2) => t1 #= t2}
+      io.outsideIdxOri.payload.zip(seq1).foreach { case (t1, t2) => t1 #= t2 }
       clockDomain.waitSampling()
       io.outsideAddrOri.valid #= false
     }
@@ -230,5 +234,43 @@ object ctrlpath_datapath_unionSim extends App {
     io.start #= false
     clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
     clockDomain.waitSampling(10)
+  }
+}
+
+case class ctrl_twRom_union(g: NttCfgParam) extends Component {
+  val io = new Bundle {
+    val start = in Bool ()
+    val ctrl = in(CtrlBus())
+    val idle = out Bool ()
+  }
+  val ctrl = new CtrlOptAddr(g)
+  val rom = new twRom(g)
+  ctrl.io.isNtt := io.ctrl.isNtt
+  ctrl.io.start := io.start
+  io.idle := ctrl.io.idle
+  rom.io.twBus := ctrl.io.TwBus
+}
+
+object ctrl_twRom_unionSim extends App {
+  val period = 10
+  val cfg = new NttCfgParam(P = PrimeCfg(24, 14), Bfu = BfuParamCfg(24, "9eg"), nttPoint = 1024, paraNum = 8)
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrl_twRom_union(cfg))
+  dut.doSim("test"){ dut =>
+    SimTimeout(10000*period)
+    import  dut._
+    clockDomain.forkStimulus(period)
+    io.ctrl.isNtt #= false
+    io.ctrl.isCal #= true
+    io.ctrl.isOutSideRead #= false
+    io.ctrl.isOutSideRead #= false
+    clockDomain.waitSampling(10)
+    io.start #= true
+    clockDomain.waitSampling()
+    io.start #= false
+    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
+    clockDomain.waitSampling(10)
+    io.ctrl.isCal #= false
+    clockDomain.waitSampling(10)
+    simSuccess()
   }
 }

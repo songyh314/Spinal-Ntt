@@ -1,6 +1,6 @@
 package Ntt.BFU
 
-import Ntt.NttCfg.{NttCfgParam, PrimeCfg}
+import Ntt.NttCfg.{BfuParamCfg, NttCfgParam, PrimeCfg}
 import org.scalatest.funsuite.AnyFunSuite
 import spinal.core._
 import spinal.core.sim._
@@ -38,6 +38,15 @@ object FastMod6432GenVerilog extends App {
   ).generate(new FastMod6432(NttCfgParam(P = PrimeCfg(64, 32))))
 }
 
+object BarretMod2414GenVerilog extends App {
+  SpinalConfig(
+    mode = Verilog,
+    targetDirectory = "NttOpt/rtl/BFU/",
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp"
+  ).generate(new BarretMod2414(NttCfgParam(P = PrimeCfg(24, 14))))
+}
+
 object FastModSim extends App {
   val dut = SimConfig.withWave.withVerilator.compile(FastMod2414(NttCfgParam()))
   val period = 10
@@ -58,7 +67,6 @@ object FastModSim extends App {
 
   }
 }
-
 
 class FastMod1412_simEnv() extends FastMod1412() {
   val drvQueue = mutable.Queue[BigInt]()
@@ -144,15 +152,15 @@ object FastMod1412_sim extends App {
   val dut = SimConfig.withXSim.withWave.workspacePath("NttOpt/sim/Bfu/FastMod412").compile(new FastMod1412_simEnv())
   val period = 10
   dut.doSim("test") { dut =>
-    SimTimeout(1000*period)
-    val Prime = new PrimeCfg(14,12)
+    SimTimeout(1000 * period)
+    val Prime = new PrimeCfg(14, 12)
     val max = (Prime.Prime - 1).pow(2)
     import dut._
     clockDomain.forkStimulus(period)
     simEnvStart()
     io.dataIn.valid #= false
     clockDomain.waitSampling(10)
-    for (i <- 0 until 64){
+    for (i <- 0 until 64) {
       val randomTest = BigInt(max.bitLength, Random) % (max - Prime.Prime) + Prime.Prime
 //      println(randomTest)
       insertData(randomTest)
@@ -164,20 +172,24 @@ object FastMod1412_sim extends App {
 }
 
 object FastModVivadoFlow extends App {
-
-  val workspace = "NttOpt/fpga/bfu/FastMod64"
+  val g = new NttCfgParam(P = PrimeCfg(24, 14), Bfu = BfuParamCfg(24, "v7"))
+  SpinalConfig(
+    mode = Verilog,
+    targetDirectory = "NttOpt/rtl/BFU",
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp"
+  ).generate(new FastMod2414(g))
+  val workspace = "NttOpt/fpga/bfu/FastMod24"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
-//  val family = "Kintex UltraScale"
-//  val device = "xcku060-ffva1156-2-i"
-  val family = "Virtex 7"
-  val device = "xc7vx485tffg1157-1"
+  val family = g.family
+  val device = g.device
   val frequency = 300 MHz
   val cpu = 8
   val rtl = new Rtl {
 
     /** Name */
-    override def getName(): String = "FastMod6432"
-    override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/BFU/FastMod6432.v"
+    override def getName(): String = "FastMod2414"
+    override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/BFU/FastMod2414.v"
   }
 
   val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
@@ -198,9 +210,41 @@ object FastMod1412VivadoFlow extends App {
 
     /** Name */
     override def getName(): String = "FastMod1412"
+
     override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/BFU/FastMod1412.v"
   }
 
   val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
+  println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
+
+}
+object BarretVivadoFlow extends App {
+  val g = new NttCfgParam(P = PrimeCfg(24, 14), Bfu = BfuParamCfg(24, "v7"))
+  SpinalConfig(
+    mode = Verilog,
+    targetDirectory = "NttOpt/rtl/BFU/",
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp"
+  ).generate(new BarretMod2414(g))
+  val workspace = "./vivado_prj/"
+  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
+  val family = g.family
+  val device = g.device
+  val frequency = 300 MHz
+  val cpu = 16
+  val xcix = g.Bfu.pathMultIP
+  val paths = Seq(
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/BFU/BarretMod2414.v"
+//      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v"
+  )
+  val rtl = new Rtl {
+
+    /** Name */
+    override def getName(): String = "BarretMod2414"
+
+    override def getRtlPaths(): Seq[String] = paths
+  }
+
+  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu, xcix)
   println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
 }

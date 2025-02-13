@@ -81,6 +81,8 @@ object shuffleMux {
   }
 
   // 1,3,4,5,9,10,12 -> 2/10
+  // bug
+  // new -> 1,2,4,5,9,10,12 -> 2/10
   case class sfMuxp8ch2_10(sw: Int = 4, expect: Int, id: Seq[Int]) extends Component {
     require(sw == 4)
     val io = new Bundle {
@@ -229,62 +231,62 @@ case class shuffleOpt(g: NttCfgParam) extends Component {
     ch3.io.muxIn := muxDrive(Seq(3, 6, 7), decTmp)
     ch7.io.muxIn := muxDrive(Seq(3, 6, 7), decTmp)
     io.idxShuffle(3) := RegNext(ch3.io.muxOut); io.idxShuffle(7) := RegNext(ch7.io.muxOut)
-  } else {null}
+  } else { null }
 
-  if(g.paraNum == 8) {
-    val ch0 = new sfMuxp8ch0_8(g.BankIndexWidth,0,Seq(0,1,8))
-    val ch8 = new sfMuxp8ch0_8(g.BankIndexWidth,8,Seq(0,1,8))
-    ch0.io.muxIn := muxDrive(Seq(0,1,8),decTmp)
-    ch8.io.muxIn := muxDrive(Seq(0,1,8),decTmp)
+  if (g.paraNum == 8) {
+    val ch0 = new sfMuxp8ch0_8(g.BankIndexWidth, 0, Seq(0, 1, 8))
+    val ch8 = new sfMuxp8ch0_8(g.BankIndexWidth, 8, Seq(0, 1, 8))
+    ch0.io.muxIn := muxDrive(Seq(0, 1, 8), decTmp)
+    ch8.io.muxIn := muxDrive(Seq(0, 1, 8), decTmp)
     io.idxShuffle(0) := RegNext(ch0.io.muxOut)
     io.idxShuffle(8) := RegNext(ch8.io.muxOut)
 
-    val ch1 = new sfMuxp8ch1_9(g.BankIndexWidth,1,Seq(1,2,3,9,10))
-    val ch9 = new sfMuxp8ch1_9(g.BankIndexWidth,9,Seq(1,2,3,9,10))
-    ch1.io.muxIn := muxDrive(Seq(1,2,3,9,10),decTmp)
-    ch9.io.muxIn := muxDrive(Seq(1,2,3,9,10),decTmp)
+    val ch1 = new sfMuxp8ch1_9(g.BankIndexWidth, 1, Seq(1, 2, 3, 9, 10))
+    val ch9 = new sfMuxp8ch1_9(g.BankIndexWidth, 9, Seq(1, 2, 3, 9, 10))
+    ch1.io.muxIn := muxDrive(Seq(1, 2, 3, 9, 10), decTmp)
+    ch9.io.muxIn := muxDrive(Seq(1, 2, 3, 9, 10), decTmp)
     io.idxShuffle(1) := RegNext(ch1.io.muxOut)
     io.idxShuffle(9) := RegNext(ch9.io.muxOut)
 
-    val ch2 = new sfMuxp8ch2_10(g.BankIndexWidth,2,Seq(1,3,4,5,9,10,12))
-    val ch10 = new sfMuxp8ch2_10(g.BankIndexWidth,10,Seq(1,3,4,5,9,10,12))
-    ch2.io.muxIn := muxDrive(Seq(1,3,4,5,9,10,12),decTmp)
-    ch10.io.muxIn := muxDrive(Seq(1,3,4,5,9,10,12),decTmp)
+    val ch2 = new sfMuxp8ch2_10(g.BankIndexWidth, 2, Seq(1, 2, 4, 5, 9, 10, 12))
+    val ch10 = new sfMuxp8ch2_10(g.BankIndexWidth, 10, Seq(1, 2, 4, 5, 9, 10, 12))
+    ch2.io.muxIn := muxDrive(Seq(1, 2, 4, 5, 9, 10, 12), decTmp)
+    ch10.io.muxIn := muxDrive(Seq(1, 2, 4, 5, 9, 10, 12), decTmp)
     io.idxShuffle(2) := RegNext(ch2.io.muxOut)
     io.idxShuffle(10) := RegNext(ch10.io.muxOut)
 
-    val ch3 = new sfMuxp8ch3_11(g.BankIndexWidth,3,Seq(3,6,7,11,14))
-    val ch11 = new sfMuxp8ch3_11(g.BankIndexWidth,11,Seq(3,6,7,11,14))
-    ch3.io.muxIn := muxDrive(Seq(3,6,7,11,14),decTmp)
-    ch11.io.muxIn := muxDrive(Seq(3,6,7,11,14),decTmp)
+    val ch3 = new sfMuxp8ch3_11(g.BankIndexWidth, 3, Seq(3, 6, 7, 11, 14))
+    val ch11 = new sfMuxp8ch3_11(g.BankIndexWidth, 11, Seq(3, 6, 7, 11, 14))
+    ch3.io.muxIn := muxDrive(Seq(3, 6, 7, 11, 14), decTmp)
+    ch11.io.muxIn := muxDrive(Seq(3, 6, 7, 11, 14), decTmp)
     io.idxShuffle(3) := RegNext(ch3.io.muxOut)
     io.idxShuffle(11) := RegNext(ch11.io.muxOut)
 
-    val ch4 = new sfMuxp8ch4_12(g.BankIndexWidth,4,Seq(1,4,8,9,12))
-    val ch12 = new sfMuxp8ch4_12(g.BankIndexWidth,12,Seq(1,4,8,9,12))
-    ch4.io.muxIn := muxDrive(Seq(1,4,8,9,12),decTmp)
-    ch12.io.muxIn := muxDrive(Seq(1,4,8,9,12),decTmp)
+    val ch4 = new sfMuxp8ch4_12(g.BankIndexWidth, 4, Seq(1, 4, 8, 9, 12))
+    val ch12 = new sfMuxp8ch4_12(g.BankIndexWidth, 12, Seq(1, 4, 8, 9, 12))
+    ch4.io.muxIn := muxDrive(Seq(1, 4, 8, 9, 12), decTmp)
+    ch12.io.muxIn := muxDrive(Seq(1, 4, 8, 9, 12), decTmp)
     io.idxShuffle(4) := RegNext(ch4.io.muxOut)
     io.idxShuffle(12) := RegNext(ch12.io.muxOut)
 
-    val ch5 = new sfMuxp8ch5_13(g.BankIndexWidth,5,Seq(3,5,6,10,11,13,14))
-    val ch13 = new sfMuxp8ch5_13(g.BankIndexWidth,13,Seq(3,5,6,10,11,13,14))
-    ch5.io.muxIn := muxDrive(Seq(3,5,6,10,11,13,14),decTmp)
-    ch13.io.muxIn := muxDrive(Seq(3,5,6,10,11,13,14),decTmp)
+    val ch5 = new sfMuxp8ch5_13(g.BankIndexWidth, 5, Seq(3, 5, 6, 10, 11, 13, 14))
+    val ch13 = new sfMuxp8ch5_13(g.BankIndexWidth, 13, Seq(3, 5, 6, 10, 11, 13, 14))
+    ch5.io.muxIn := muxDrive(Seq(3, 5, 6, 10, 11, 13, 14), decTmp)
+    ch13.io.muxIn := muxDrive(Seq(3, 5, 6, 10, 11, 13, 14), decTmp)
     io.idxShuffle(5) := RegNext(ch5.io.muxOut)
     io.idxShuffle(13) := RegNext(ch13.io.muxOut)
 
-    val ch6 = new sfMuxp8ch6_14(g.BankIndexWidth,6,Seq(5,6,12,13,14))
-    val ch14 = new sfMuxp8ch6_14(g.BankIndexWidth,14,Seq(5,6,12,13,14))
-    ch6.io.muxIn := muxDrive(Seq(5,6,12,13,14),decTmp)
-    ch14.io.muxIn := muxDrive(Seq(5,6,12,13,14),decTmp)
+    val ch6 = new sfMuxp8ch6_14(g.BankIndexWidth, 6, Seq(5, 6, 12, 13, 14))
+    val ch14 = new sfMuxp8ch6_14(g.BankIndexWidth, 14, Seq(5, 6, 12, 13, 14))
+    ch6.io.muxIn := muxDrive(Seq(5, 6, 12, 13, 14), decTmp)
+    ch14.io.muxIn := muxDrive(Seq(5, 6, 12, 13, 14), decTmp)
     io.idxShuffle(6) := RegNext(ch6.io.muxOut)
     io.idxShuffle(14) := RegNext(ch14.io.muxOut)
 
-    val ch7 = new sfMuxp8ch7_15(g.BankIndexWidth,7,Seq(7,14,15))
-    val ch15 = new sfMuxp8ch7_15(g.BankIndexWidth,15,Seq(7,14,15))
-    ch7.io.muxIn := muxDrive(Seq(7,14,15),decTmp)
-    ch15.io.muxIn := muxDrive(Seq(7,14,15),decTmp)
+    val ch7 = new sfMuxp8ch7_15(g.BankIndexWidth, 7, Seq(7, 14, 15))
+    val ch15 = new sfMuxp8ch7_15(g.BankIndexWidth, 15, Seq(7, 14, 15))
+    ch7.io.muxIn := muxDrive(Seq(7, 14, 15), decTmp)
+    ch15.io.muxIn := muxDrive(Seq(7, 14, 15), decTmp)
     io.idxShuffle(7) := RegNext(ch7.io.muxOut)
     io.idxShuffle(15) := RegNext(ch15.io.muxOut)
   }
@@ -366,14 +368,7 @@ case class memInMux(g: NttCfgParam) extends Component {
   }
   import io._
   import DataPathTools._
-//  def muxDrive(num: Seq[Int], dataIn: Vec[Bits]): Vec[Bits] = {
-//    val size = num.size
-//    val ret = Vec(Bits(dataIn.head.getWidth bits), size)
-//    for (i <- 0 until num.size) {
-//      ret(i) := dataIn(num(i))
-//    }
-//    ret
-//  }
+
   if (g.paraNum == 4) {
 
     val ch0 = Mux3ch0_4p4(g.width, g.BankIndexWidth)
@@ -649,7 +644,7 @@ case class memOutArb(g: NttCfgParam) extends Component {
 
     val ch3 = new dataMux6ch3_9_10p8(g.width)
     ch3.io.sel := idx(3)
-    ch3.io.muxIn := muxDrive(Seq(1, 3, 5, 9, 10, 11), dataMem)
+    ch3.io.muxIn := muxDrive(Seq(1, 3, 5, 9, 11, 13), dataMem)
     io.dataOrder(3) := ch3.io.muxOut
 
     val ch4 = new dataMux4ch4_7_8_11p8(g.width)
@@ -842,7 +837,8 @@ case class DataPathTop(g: NttCfgParam) extends Component {
 
   val tw = new Area {
     val rom = new twRom(g)
-    rom.io.twBus := Delay(io.twBus, (g.Arbit.DecodeLatency + g.Arbit.DatDeMuxLatency - g.Arbit.romMuxLatency)).addAttribute("srl_style", "srl")
+    rom.io.twBus := Delay(io.twBus, (g.Arbit.DecodeLatency + g.Arbit.DatDeMuxLatency - g.Arbit.romMuxLatency))
+      .addAttribute("srl_style", "srl")
   }
 
   val fc = memForwardCtrl(g)
