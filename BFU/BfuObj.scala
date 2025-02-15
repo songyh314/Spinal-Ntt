@@ -1,6 +1,6 @@
 package Ntt.BFU
 
-import Ntt.NttCfg.{BfuPayload, DataPayload, NttCfgParam}
+import Ntt.NttCfg.{BfuParamCfg, BfuPayload, DataPayload, NttCfgParam, PrimeCfg}
 import spinal.core._
 import spinal.core.sim._
 import spinal.lib._
@@ -12,24 +12,24 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
 object BfuGold extends App {
-  val g = NttCfgParam()
+  val cfg = new NttCfgParam(P = PrimeCfg(64,32), Bfu = BfuParamCfg(64,"9eg"))
   val debug = false
   def AddSub(A: BigInt = 0, B: BigInt = 0, isRescale: Boolean): (BigInt, BigInt) = {
-    var addRes = (A + B) % NttCfgParam().Prime
-    var subRes = if (A > B) A - B else (A + NttCfgParam().Prime) - B
+    var addRes = (A + B) % cfg.Prime
+    var subRes = if (A > B) A - B else (A + cfg.Prime) - B
     if (isRescale) {
       if (addRes % 2 == 1) {
-        addRes = addRes / 2 + NttCfgParam().HalfPrime
+        addRes = addRes / 2 + cfg.HalfPrime
       } else { addRes = addRes / 2 }
       if (subRes % 2 == 1) {
-        subRes = subRes / 2 + NttCfgParam().HalfPrime
+        subRes = subRes / 2 + cfg.HalfPrime
       } else { subRes = subRes / 2 }
     }
     if (debug) println(s"add : $addRes , subu : $subRes")
     (addRes, subRes)
   }
   def ModMult(A: BigInt, B: BigInt): BigInt = {
-    val ret = (A * B) % NttCfgParam().Prime
+    val ret = (A * B) % cfg.Prime
     if (debug) println(s"modmult res : $ret")
     ret
   }
@@ -39,7 +39,8 @@ object BfuGold extends App {
       AddSub(A, tmpB, isRescale = false)
     } else {
       val (tmpA, tmpB) = AddSub(A, B, isRescale = true)
-      (tmpA, ModMult(tmpB, Tw))
+      val invTw = cfg.Prime - Tw
+      (tmpA, ModMult(tmpB, invTw))
     }
   }
 }
@@ -47,100 +48,102 @@ object BfuGold extends App {
 case class DrvData(A: BigInt, B: BigInt, TW: BigInt, isNtt: Boolean)
 case class MonData(A: BigInt, B: BigInt)
 
-case class BfuSim() extends Bfu(NttCfgParam()) {
-  val drvQueue = mutable.Queue[DrvData]()
-  val drvMon = mutable.Queue[DrvData]()
-  val refQueue = mutable.Queue[MonData]()
-  val resQueue = mutable.Queue[MonData]()
-
-  @volatile private var stop: Boolean = false
-  def simInit(): Unit = {
-    io.dataIn.valid #= false
-    io.isNtt #= true
-    clockDomain.waitSampling(10)
-  }
-  def refModule(dataIn: DrvData): Unit = {
-    val (resA, resB) = BfuGold.Bfu(dataIn.A, dataIn.B, dataIn.TW, dataIn.isNtt)
-    refQueue.enqueue(MonData(resA, resB))
-  }
-  def Driver(): Unit = {
-    val drv = fork {
-      while (!stop) {
-        if (drvQueue.nonEmpty) {
-          val test = drvQueue.dequeue()
-          refModule(test)
-          io.dataIn.payload.A #= test.A
-          io.dataIn.payload.B #= test.B
-          io.dataIn.payload.Tw #= test.TW
-          io.dataIn.valid #= true
-          clockDomain.waitSampling()
-          io.dataIn.valid #= false
-        } else { clockDomain.waitSampling() }
-      }
-    }
-  }
-  def Monitor(): Unit = {
-    val mon = fork {
-      while (!stop) {
-        if (io.dataOut.valid.toBoolean) {
-          resQueue.enqueue(MonData(io.dataOut.payload.A.toBigInt, io.dataOut.payload.B.toBigInt))
-        }
-        clockDomain.waitSampling()
-      }
-    }
-  }
-  def scoreBoard(): Unit = {
-    val score = fork {
-      while (!stop) {
-        if (refQueue.nonEmpty && resQueue.nonEmpty) {
-          val drv = drvMon.dequeue()
-          val calRes = resQueue.dequeue()
-          val calRef = refQueue.dequeue()
-          assert(calRes == calRef, s"data mismatch input:${drv} res:${calRes}  ref:${calRef}")
-          println(s"data:${drv} res:${calRes}  ref:${calRef}")
-          if (calRes != calRef) {
-            println(s"error!: data:${drv} res:${calRes}  ref:${calRef}")
-          }
-        }
-        clockDomain.waitSampling()
-      }
-    }
-  }
-  def simEnvStart(): Unit = {
-    simInit()
-    Driver()
-    Monitor()
-    scoreBoard()
-  }
-  def waitSimDone(): Unit = {
-    clockDomain.waitSampling(10)
-    while (refQueue.nonEmpty || resQueue.nonEmpty) {
-      clockDomain.waitSampling(10)
-    }
-    stop = true
-    clockDomain.waitSampling(10)
-    println("sim finish")
-    simSuccess()
-  }
-  def waitClean(): Unit = {
-    clockDomain.waitSampling(10)
-    while (refQueue.nonEmpty || resQueue.nonEmpty) {
-      clockDomain.waitSampling(1)
-    }
-    clockDomain.waitSampling(10)
-  }
-  def insertData(test: DrvData): Unit = {
-    drvQueue.enqueue(test)
-    drvMon.enqueue(test)
-  }
-}
 object BfuGenV extends App {
   SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "./rtl/Ntt/Bfu")
     .generate(new Bfu(NttCfgParam(), debug = false))
 }
 
 object BfuSimFlow extends App {
-  val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/")
+
+  val g = NttCfgParam(P = PrimeCfg(64,32), Bfu = BfuParamCfg(64,"9eg"))
+  case class BfuSim() extends Bfu(g) {
+    val drvQueue = mutable.Queue[DrvData]()
+    val drvMon = mutable.Queue[DrvData]()
+    val refQueue = mutable.Queue[MonData]()
+    val resQueue = mutable.Queue[MonData]()
+
+    @volatile private var stop: Boolean = false
+    def simInit(): Unit = {
+      io.dataIn.valid #= false
+      io.isNtt #= true
+      clockDomain.waitSampling(10)
+    }
+    def refModule(dataIn: DrvData): Unit = {
+      val (resA, resB) = BfuGold.Bfu(dataIn.A, dataIn.B, dataIn.TW, dataIn.isNtt)
+      refQueue.enqueue(MonData(resA, resB))
+    }
+    def Driver(): Unit = {
+      val drv = fork {
+        while (!stop) {
+          if (drvQueue.nonEmpty) {
+            val test = drvQueue.dequeue()
+            refModule(test)
+            io.dataIn.payload.A #= test.A
+            io.dataIn.payload.B #= test.B
+            io.dataIn.payload.Tw #= test.TW
+            io.dataIn.valid #= true
+            clockDomain.waitSampling()
+            io.dataIn.valid #= false
+          } else { clockDomain.waitSampling() }
+        }
+      }
+    }
+    def Monitor(): Unit = {
+      val mon = fork {
+        while (!stop) {
+          if (io.dataOut.valid.toBoolean) {
+            resQueue.enqueue(MonData(io.dataOut.payload.A.toBigInt, io.dataOut.payload.B.toBigInt))
+          }
+          clockDomain.waitSampling()
+        }
+      }
+    }
+    def scoreBoard(): Unit = {
+      val score = fork {
+        while (!stop) {
+          if (refQueue.nonEmpty && resQueue.nonEmpty) {
+            val drv = drvMon.dequeue()
+            val calRes = resQueue.dequeue()
+            val calRef = refQueue.dequeue()
+            assert(calRes == calRef, s"data mismatch input:${drv} res:${calRes}  ref:${calRef}")
+            println(s"data:${drv} res:${calRes}  ref:${calRef}")
+            if (calRes != calRef) {
+              println(s"error!: data:${drv} res:${calRes}  ref:${calRef}")
+            }
+          }
+          clockDomain.waitSampling()
+        }
+      }
+    }
+    def simEnvStart(): Unit = {
+      simInit()
+      Driver()
+      Monitor()
+      scoreBoard()
+    }
+    def waitSimDone(): Unit = {
+      clockDomain.waitSampling(10)
+      while (refQueue.nonEmpty || resQueue.nonEmpty) {
+        clockDomain.waitSampling(10)
+      }
+      stop = true
+      clockDomain.waitSampling(10)
+      println("sim finish")
+      simSuccess()
+    }
+    def waitClean(): Unit = {
+      clockDomain.waitSampling(10)
+      while (refQueue.nonEmpty || resQueue.nonEmpty) {
+        clockDomain.waitSampling(1)
+      }
+      clockDomain.waitSampling(10)
+    }
+    def insertData(test: DrvData): Unit = {
+      drvQueue.enqueue(test)
+      drvMon.enqueue(test)
+    }
+  }
+  val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul")
   val dut = SimConfig.withXSim
     .withXilinxDevice("xczu9eg-ffvb1156-2-i")
     .withXSimSourcesPaths(path, path)
@@ -149,8 +152,8 @@ object BfuSimFlow extends App {
   dut.doSim("test") { dut =>
     import dut._
     val g = NttCfgParam()
-    SimTimeout(5000 * period)
-    clockDomain.forkStimulus(period)
+//    SimTimeout(5000 * period)
+    clockDomain.forkStimulus(period ns)
     simEnvStart()
     io.isNtt #= true
     for (i <- 0 until (1024)) {

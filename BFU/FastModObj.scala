@@ -66,103 +66,116 @@ object FastModSim extends App {
     clockDomain.waitSampling(10)
 
   }
+
 }
 
-class FastMod1412_simEnv() extends FastMod1412() {
-  val drvQueue = mutable.Queue[BigInt]()
-  val drvMon = mutable.Queue[BigInt]()
-  val refQueue = mutable.Queue[BigInt]()
-  val resQueue = mutable.Queue[BigInt]()
+object FastMod_sim extends App {
 
-  @volatile private var stop: Boolean = false
-  def refModule(dataIn: BigInt): Unit = {
-    val dataIn = io.dataIn.payload
-    val ref: BigInt = (dataIn.toBigInt % g.Prime)
-    refQueue.enqueue(ref)
-  }
-  def Driver(): Unit = {
-    val drv = fork {
-      while (!stop) {
-        if (drvQueue.nonEmpty) {
-          val test = drvQueue.dequeue()
-          refModule(test)
-          io.dataIn.payload #= test
-          io.dataIn.valid #= true
-          clockDomain.waitSampling()
-          io.dataIn.valid #= false
-        } else { clockDomain.waitSampling() }
-      }
+  val cfg = NttCfgParam(P = PrimeCfg(64, 32), Bfu = BfuParamCfg(64, "9eg"))
+  class FastMod_simEnv() extends FastMod6432(cfg) {
+    val drvQueue = mutable.Queue[BigInt]()
+    val drvMon = mutable.Queue[BigInt]()
+    val refQueue = mutable.Queue[BigInt]()
+    val resQueue = mutable.Queue[BigInt]()
+
+    @volatile private var stop: Boolean = false
+
+    def refModule(dataIn: BigInt): Unit = {
+//      val dataIn = io.dataIn.payload
+      val ref: BigInt = (dataIn.toBigInt % cfg.Prime)
+      refQueue.enqueue(ref)
     }
-  }
-  def Monitor(): Unit = {
-    val mon = fork {
-      while (!stop) {
-        if (io.dataOut.valid.toBoolean) { resQueue.enqueue(io.dataOut.payload.toBigInt) }
-        clockDomain.waitSampling()
-      }
-    }
-  }
-  def scoreBoard(): Unit = {
-    val score = fork {
-      while (!stop) {
-        if (refQueue.nonEmpty && resQueue.nonEmpty) {
-          val drvData = drvMon.dequeue()
-          val calRes = resQueue.dequeue()
-          val calRef = refQueue.dequeue()
-//          assert(calRes == calRef, s"data mismatch input:${drvData} res:${calRes}  ref:${calRef}")
-//          println(s"data:${drvData} res:${calRes}  ref:${calRef}")
-          if (calRes != calRef) {
-            println(s"data:${drvData} res:${calRes}  ref:${calRef}")
+
+    def Driver(): Unit = {
+      val drv = fork {
+        while (!stop) {
+          if (drvQueue.nonEmpty) {
+            val test = drvQueue.dequeue()
+            refModule(test)
+            io.dataIn.payload #= test
+            io.dataIn.valid #= true
+            clockDomain.waitSampling()
+            io.dataIn.valid #= false
+          } else {
+            clockDomain.waitSampling()
           }
         }
-        clockDomain.waitSampling()
       }
     }
-  }
-  def simEnvStart(): Unit = {
-    //      simInit()
-    Driver()
-    Monitor()
-    scoreBoard()
-  }
-  def waitSimDone(): Unit = {
-    clockDomain.waitSampling(10)
-    while (refQueue.nonEmpty || resQueue.nonEmpty) {
+    def Monitor(): Unit = {
+      val mon = fork {
+        while (!stop) {
+          if (io.dataOut.valid.toBoolean) {
+            resQueue.enqueue(io.dataOut.payload.toBigInt)
+          }
+          clockDomain.waitSampling()
+        }
+      }
+    }
+    def scoreBoard(): Unit = {
+      val score = fork {
+        while (!stop) {
+          if (refQueue.nonEmpty && resQueue.nonEmpty) {
+            val drvData = drvMon.dequeue()
+            val calRes = resQueue.dequeue()
+            val calRef = refQueue.dequeue()
+            //          assert(calRes == calRef, s"data mismatch input:${drvData} res:${calRes}  ref:${calRef}")
+            //          println(s"data:${drvData} res:${calRes}  ref:${calRef}")
+            if (calRes != calRef) {
+              println(s"data:${drvData} res:${calRes}  ref:${calRef}")
+            }
+          }
+          clockDomain.waitSampling()
+        }
+      }
+    }
+
+    def simEnvStart(): Unit = {
+      //      simInit()
+      println(s"Prime = ${cfg.Prime}")
+      Driver()
+      Monitor()
+      scoreBoard()
+    }
+
+    def waitSimDone(): Unit = {
+      clockDomain.waitSampling(10)
+      while (refQueue.nonEmpty || resQueue.nonEmpty) {
+        clockDomain.waitSampling(10)
+      }
+      stop = true
+      clockDomain.waitSampling(10)
+      println("sim finish")
+      simSuccess()
+    }
+
+    def waitClean(): Unit = {
+      clockDomain.waitSampling(10)
+      while (refQueue.nonEmpty || resQueue.nonEmpty) {
+        clockDomain.waitSampling(1)
+      }
       clockDomain.waitSampling(10)
     }
-    stop = true
-    clockDomain.waitSampling(10)
-    println("sim finish")
-    simSuccess()
-  }
-  def waitClean(): Unit = {
-    clockDomain.waitSampling(10)
-    while (refQueue.nonEmpty || resQueue.nonEmpty) {
-      clockDomain.waitSampling(1)
-    }
-    clockDomain.waitSampling(10)
-  }
-  def insertData(test: BigInt = 0): Unit = {
-    drvQueue.enqueue(test)
-    drvMon.enqueue(test)
-  }
-}
 
-object FastMod1412_sim extends App {
-  val dut = SimConfig.withXSim.withWave.workspacePath("NttOpt/sim/Bfu/FastMod412").compile(new FastMod1412_simEnv())
+    def insertData(test: BigInt = 0): Unit = {
+      drvQueue.enqueue(test)
+      drvMon.enqueue(test)
+    }
+  }
+  val dut = SimConfig.withXSim.withWave.workspacePath("NttOpt/sim/Bfu/FastMod6432" ).compile(new FastMod_simEnv())
   val period = 10
   dut.doSim("test") { dut =>
-    SimTimeout(1000 * period)
-    val Prime = new PrimeCfg(14, 12)
+    SimTimeout(1000 * period ns)
+    val Prime = new PrimeCfg(64, 32)
     val max = (Prime.Prime - 1).pow(2)
     import dut._
-    clockDomain.forkStimulus(period)
+    clockDomain.forkStimulus(period ns)
     simEnvStart()
     io.dataIn.valid #= false
     clockDomain.waitSampling(10)
     for (i <- 0 until 64) {
       val randomTest = BigInt(max.bitLength, Random) % (max - Prime.Prime) + Prime.Prime
-//      println(randomTest)
+      //      println(randomTest)
       insertData(randomTest)
     }
     clockDomain.waitSampling(10)
@@ -170,7 +183,6 @@ object FastMod1412_sim extends App {
   }
 
 }
-
 object FastModVivadoFlow extends App {
   val g = new NttCfgParam(P = PrimeCfg(24, 14), Bfu = BfuParamCfg(24, "v7"))
   SpinalConfig(
@@ -189,6 +201,7 @@ object FastModVivadoFlow extends App {
 
     /** Name */
     override def getName(): String = "FastMod2414"
+
     override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/BFU/FastMod2414.v"
   }
 
@@ -218,6 +231,7 @@ object FastMod1412VivadoFlow extends App {
   println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
 
 }
+
 object BarretVivadoFlow extends App {
   val g = new NttCfgParam(P = PrimeCfg(24, 14), Bfu = BfuParamCfg(24, "v7"))
   SpinalConfig(
@@ -235,7 +249,7 @@ object BarretVivadoFlow extends App {
   val xcix = g.Bfu.pathMultIP
   val paths = Seq(
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/BFU/BarretMod2414.v"
-//      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v"
+    //      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v"
   )
   val rtl = new Rtl {
 

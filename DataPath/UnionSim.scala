@@ -253,12 +253,12 @@ case class ctrl_twRom_union(g: NttCfgParam) extends Component {
 
 object ctrl_twRom_unionSim extends App {
   val period = 10
-  val cfg = new NttCfgParam(P = PrimeCfg(24, 14), Bfu = BfuParamCfg(24, "9eg"), nttPoint = 1024, paraNum = 8)
+  val cfg = new NttCfgParam(P = PrimeCfg(64, 32), Bfu = BfuParamCfg(64, "9eg"), nttPoint = 1024, paraNum = 4)
   val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim/UnionSim").compile(new ctrl_twRom_union(cfg))
-  dut.doSim("test"){ dut =>
-    SimTimeout(10000*period)
+  dut.doSimUntilVoid("test"){ dut =>
+//    SimTimeout(1000*period ns)
     import  dut._
-    clockDomain.forkStimulus(period)
+    clockDomain.forkStimulus(period ns)
     io.ctrl.isNtt #= false
     io.ctrl.isCal #= true
     io.ctrl.isOutSideRead #= false

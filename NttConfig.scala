@@ -43,13 +43,15 @@ object NttCfg {
     }
   }
 
-  case class BfuParamCfg(M:Int = 24,device:String = "9eg") {
+  case class BfuParamCfg(M: Int = 24, device: String = "9eg", spiltMul: Boolean = false) {
     val AddSubLatencyIntt = 3 // add&sub + rescale
     val AddSubLatencyNtt = 2 // add&sub
+    val dspWidth = if (spiltMul) { M/2 }
+    else { M }
     val MultLatency = M match {
       case 14 => 3
       case 24 => 4
-      case 64 => 18
+      case 64 => if (spiltMul) {8} else {18}
     }
     val FastModLatency = M match {
       case 14 => 4
@@ -71,7 +73,6 @@ object NttCfg {
     val DatDeMuxLatency = 1 // addrdecode -> mem -> datademux -> bfu
   }
 
-
   case class NttCfgParam(
       Bfu: BfuParamCfg = BfuParamCfg(),
       Arbit: ArbitParamCfg = ArbitParamCfg(),
@@ -79,7 +80,7 @@ object NttCfg {
       nttPoint: Int = 1024,
       paraNum: Int = 4,
       debug: Boolean = false,
-      nttSimPublic:Boolean = true
+      nttSimPublic: Boolean = true
   ) {
     val radix = 2
 
@@ -136,14 +137,13 @@ object NttCfg {
     val initTableCompress = tools.wordCat(initTable, paraNum, width)
 
     val family = Bfu.device match {
-      case "v7" => "Virtex 7"
+      case "v7"  => "Virtex 7"
       case "9eg" => "Zynq UltraScale+ MPSoCS"
     }
     val device = Bfu.device match {
       case "9eg" => "xczu9eg-ffvb1156-2-i"
-      case "v7" => "xc7vx485tffg1157-2"
+      case "v7"  => "xc7vx485tffg1157-2"
     }
-
 
   }
 

@@ -168,12 +168,12 @@ case class FastMod6432(g: NttCfgParam) extends Component {
   }
   val sliceData = io.dataIn.payload.subdivideIn(4 slices)
   val st1_res1_tmp = sliceData(2) +^ sliceData(1)
-  val st1_res2_tmp = (sliceData(3) -^ sliceData(0) -^ sliceData(1)).asSInt
+  val st1_res2_tmp = (sliceData(0) -^ (sliceData(3) +^ sliceData(2))).asSInt
   val st1_res1 = RegNextWhen(st1_res1_tmp, io.dataIn.valid)
   val st1_res2 = RegNextWhen(st1_res2_tmp, io.dataIn.valid)
   val st2_res_tmp = (st1_res1 << g.P.N).asSInt +^ st1_res2
   val st2_res = RegNext(st2_res_tmp)
-  val of_flag = st2_res >= g.Prime
+  val of_flag = st2_res.asUInt >= g.Prime
   val uf_flag = st2_res < 0
   val st3_of = (st2_res - g.Prime).asUInt.resize(g.width bits)
   val st3_uf = (st2_res + g.Prime).asUInt.resize(g.width bits)

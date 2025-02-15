@@ -85,7 +85,7 @@ case class NttTop(g: NttCfgParam, debug: Boolean = false) extends Component {
 
 object NttTopSim extends App {
   val period = 10
-  val cfg = new NttCfgParam(P = PrimeCfg(24,14),Bfu = BfuParamCfg(24,"9eg"),nttPoint = 1024, paraNum = 8)
+  val cfg = new NttCfgParam(P = PrimeCfg(64,32),Bfu = BfuParamCfg(64,"9eg"),nttPoint = 1024, paraNum = 4)
   val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/")
   val dut = SimConfig.withXSim
     .withXilinxDevice("xczu9eg-ffvb1156-2-i")
@@ -94,10 +94,10 @@ object NttTopSim extends App {
     .withWave
     .compile(new NttTop(cfg, debug = false))
 //    .compile(new NttTop(NttCfgParam(P = PrimeCfg(24,14),Bfu = BfuParamCfg(24,"9eg"),nttPoint = 1024, paraNum = 4), debug = false))
-  dut.doSim { dut =>
+  dut.doSimUntilVoid { dut =>
     import dut._
-    SimTimeout(4000 * period)
-    clockDomain.forkStimulus(period)
+//    SimTimeout(4000 * period)
+    clockDomain.forkStimulus(period ns)
 
     io.start #= false
     io.start #= false
@@ -143,7 +143,7 @@ object NttTopSim extends App {
       val p_new = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/in_new.txt")
       while (flag) {
         if (io.bfuIn(0).valid.toBoolean) {
-          val flatSeq = io.bfuIn.map{item => (item.payload.A.toLong,item.payload.B.toLong,item.payload.Tw.toLong)}
+          val flatSeq = io.bfuIn.map{item => (item.payload.A.toBigInt,item.payload.B.toBigInt,item.payload.Tw.toBigInt)}
           flatSeq.map(p_new.println)
 
           clockDomain.waitSampling()
@@ -155,7 +155,7 @@ object NttTopSim extends App {
       val p_new = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/out_new.txt")
       while (flag) {
         if (io.bfuOut(0).valid.toBoolean) {
-          val flatSeq = io.bfuOut.map{item => (item.payload.A.toLong,item.payload.B.toLong)}
+          val flatSeq = io.bfuOut.map{item => (item.payload.A.toBigInt,item.payload.B.toBigInt)}
           flatSeq.map(p_new.println)
 
           clockDomain.waitSampling()
@@ -171,7 +171,7 @@ object NttTopSim extends App {
     clockDomain.waitSampling()
     io.start #= false
     clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
-    clockDomain.waitSampling(20)
+    clockDomain.waitSampling(50)
     io.ctrl.isCal #= false
     clockDomain.waitSampling(20)
 
@@ -187,12 +187,12 @@ object NttTopSim extends App {
       val p_new = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/intt_in_new.txt")
       while (flag_intt) {
         if (io.bfuIn(0).valid.toBoolean) {
-          val flatSeq = io.bfuIn.map{item => (item.payload.A.toLong,item.payload.B.toLong,item.payload.Tw.toLong)}
+
+          val flatSeq = io.bfuIn.map{item => (item.payload.A.toBigInt,item.payload.B.toBigInt,(g.Prime.toBigInt - item.payload.Tw.toBigInt))}
           flatSeq.map(p_new.println)
           clockDomain.waitSampling()
         } else { clockDomain.waitSampling() }
       }
-
       p_new.close()
     }
     val recinttOut = fork {
@@ -200,7 +200,7 @@ object NttTopSim extends App {
       val p_new = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/intt_out_new.txt")
       while (flag_intt) {
         if (io.bfuOut(0).valid.toBoolean) {
-          val flatSeq = io.bfuOut.map{item => (item.payload.A.toLong,item.payload.B.toLong)}
+          val flatSeq = io.bfuOut.map{item => (item.payload.A.toBigInt,item.payload.B.toBigInt)}
           flatSeq.map(p_new.println)
 
           clockDomain.waitSampling()
@@ -209,6 +209,7 @@ object NttTopSim extends App {
       p_new.close()
     }
 
+    clockDomain.waitSampling(100)
     io.ctrl.isNtt #= false
     io.ctrl.isCal #= true
     clockDomain.waitSampling()
@@ -239,6 +240,7 @@ object NttTopSim extends App {
     clockDomain.waitSampling(10)
     io.ctrl.isOutSideRead #= false
     clockDomain.waitSampling(10)
+    simSuccess()
   }
 }
 
@@ -253,7 +255,7 @@ object NttTopGenV extends App {
 }
 
 object NttTopVivadoFlow extends App {
-  val g = NttCfgParam(P= PrimeCfg(14,12),Bfu = BfuParamCfg(14,"v7"),nttPoint = 1024, paraNum = 4,nttSimPublic = false)
+  val g = NttCfgParam(P= PrimeCfg(64,32),Bfu = BfuParamCfg(64,"9eg"),nttPoint = 1024, paraNum = 4, nttSimPublic = false)
   SpinalConfig(
     mode = Verilog,
     nameWhenByFile = false,

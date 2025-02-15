@@ -1,6 +1,6 @@
 package Ntt.BFU
 
-import Ntt.NttCfg.{BfuParamCfg, NttCfgParam, PrimeCfg, multPayload}
+import Ntt.NttCfg._
 import spinal.core._
 import spinal.core.sim._
 import spinal.lib._
@@ -11,34 +11,25 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
+object MultSim extends App {
 
-case class Pair(A: BigInt = 0, B: BigInt = 0)
+  val spinalConfig = SpinalConfig(defaultClockDomainFrequency = FixedFrequency(10 MHz))
+  val cfg =
+    new NttCfgParam(P = PrimeCfg(64, 32), Bfu = BfuParamCfg(64, "9eg", spiltMul = true), nttPoint = 1024, paraNum = 4)
 
-object ModMultGenV extends App {
-  SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "./rtl/Ntt/Bfu")
-    .generate(new ModMult(NttCfgParam()))
-}
-
-object ModMultClusterGenV extends App {
-  SpinalConfig(mode = Verilog, nameWhenByFile = false, anonymSignalPrefix = "tmp", targetDirectory = "NttOpt/rtl/BFU")
-    .generate(new ModMultCluster(NttCfgParam(P = PrimeCfg(14,12))))
-}
-
-object ModMultSimFLow extends App {
-  val cfg = new NttCfgParam(P = PrimeCfg(64,32),Bfu = BfuParamCfg(64,"9eg"),nttPoint = 1024,paraNum = 4)
-  case class ModMultSim() extends ModMultCluster(g = cfg) {
-    val drvQueue = mutable.Queue[Pair]()
-    val drvMon = mutable.Queue[Pair]()
+  case class MultsimEnv() extends Mult(cfg) {
+    case class MultIn(A: BigInt = 0, B: BigInt = 0) {}
+    @volatile private var stop: Boolean = false
+    val drvQueue = mutable.Queue[MultIn]()
+    val drvMon = mutable.Queue[MultIn]()
     val refQueue = mutable.Queue[BigInt]()
     val resQueue = mutable.Queue[BigInt]()
 
-    @volatile private var stop: Boolean = false
-    def setInit():Unit = {
+    def simInit(): Unit = {
       io.dataIn.valid #= false
-      clockDomain.waitSampling(10)
     }
-    def refModule(dataIn: Pair): Unit = {
-      val ref = (dataIn.A * dataIn.B) % cfg.Prime
+    def refModule(dataIn: MultIn): Unit = {
+      val ref = dataIn.A * dataIn.B
       refQueue.enqueue(ref)
     }
     def Driver(): Unit = {
@@ -59,9 +50,7 @@ object ModMultSimFLow extends App {
     def Monitor(): Unit = {
       val mon = fork {
         while (!stop) {
-          if (io.dataOut.valid.toBoolean) {
-            resQueue.enqueue(io.dataOut.payload.toBigInt)
-          }
+          if (io.dataOut.valid.toBoolean) { resQueue.enqueue(io.dataOut.payload.toBigInt) }
           clockDomain.waitSampling()
         }
       }
@@ -73,7 +62,7 @@ object ModMultSimFLow extends App {
             val drvData = drvMon.dequeue()
             val calRes = resQueue.dequeue()
             val calRef = refQueue.dequeue()
-            //          assert(calRes == calRef, s"data mismatch input:${drvData} res:${calRes}  ref:${calRef}")
+//            assert(calRes == calRef, s"data mismatch input:${drvData} res:${calRes}  ref:${calRef}")
             if (calRes != calRef) {
               println(s"data:${drvData} res:${calRes}  ref:${calRef}")
             }
@@ -83,8 +72,7 @@ object ModMultSimFLow extends App {
       }
     }
     def simEnvStart(): Unit = {
-      //      simInit()
-      setInit()
+      simInit()
       Driver()
       Monitor()
       scoreBoard()
@@ -99,54 +87,72 @@ object ModMultSimFLow extends App {
       println("sim finish")
       simSuccess()
     }
-    def insertData(A: BigInt = 0, B: BigInt = 0): Unit = {
-      drvQueue.enqueue(Pair(A, B))
-      drvMon.enqueue(Pair(A, B))
+    def waitClean(): Unit = {
+      clockDomain.waitSampling(10)
+      while (refQueue.nonEmpty || resQueue.nonEmpty) {
+        clockDomain.waitSampling(1)
+      }
+      clockDomain.waitSampling(10)
+    }
+    def insertData(test: MultIn): Unit = {
+      drvQueue.enqueue(test)
+      drvMon.enqueue(test)
     }
   }
-
   val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul")
-  val dut = SimConfig.withXSim.withWave
-    .withXilinxDevice("xczu9eg-ffvb1156-2-i")
-    .workspacePath("NttOpt/sim/Bfu")
+  val dut = SimConfig.withXSim
+    .withConfig(spinalConfig)
+    .allOptimisation
+    .withXilinxDevice(cfg.device)
+    .workspacePath("./NttOpt/sim/Bfu/Mult")
     .withXSimSourcesPaths(path, path)
-    .compile(new ModMultSim())
-  val period = 10
-  val test = new Pair()
-  val p = cfg.Prime
+    .withWave
+    .compile(new MultsimEnv())
 
-  val max = (p - 1).pow(2)
-  dut.doSim("test") { dut =>
+  dut.doSimUntilVoid("test") { dut =>
     import dut._
-//    SimTimeout(100000 * period)
-    clockDomain.forkStimulus(period ns)
+    clockDomain.forkStimulus(10 ns)
     simEnvStart()
-    for (i <- 0 until 8192 ) {
-      val randomA = (BigInt(max.bitLength, Random) % p) - 1
-      val randomB = (BigInt(max.bitLength, Random) % p) - 1
-      insertData(randomA, randomB)
+    clockDomain.waitSampling(10)
+    for (i <- 0 until  1024){
+      val randA = (BigInt(cfg.Prime.bitLength, Random) % cfg.Prime) - 1
+      val randB = (BigInt(cfg.Prime.bitLength, Random) % cfg.Prime) - 1
+      insertData(MultIn(randA,randB))
     }
     waitSimDone()
   }
+
 }
 
-object ModMultVivadoFlow extends App {
+object MultGenVerilog extends App {
+  val cfg = new NttCfgParam(P = PrimeCfg(64, 32), Bfu = BfuParamCfg(64, "9eg"), nttPoint = 1024, paraNum = 4)
+  SpinalConfig(
+    mode = Verilog,
+    targetDirectory = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/BFU",
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp"
+  ).generate(new Mult(cfg))
+}
 
-  val workspace = "./vivado_prj/"
+object MultVivadoFlow extends App {
+  val workspace = "./vivado_prj/Ntt/FastMod"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
   val family = "Zynq UltraScale+ MPSoCS"
   val device = "xczu9eg-ffvb1156-2-i"
   val frequency = 300 MHz
   val cpu = 8
+
   val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
+  val top = "xMul"
   val paths = Seq(
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/Bfu/ModMult.v",
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/Mult/xMul.v",
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v"
   )
+
   val rtl = new Rtl {
 
     /** Name */
-    override def getName(): String = "ModMult"
+    override def getName(): String = top
     override def getRtlPaths(): Seq[String] = paths
   }
 
