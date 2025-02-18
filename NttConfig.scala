@@ -61,7 +61,7 @@ object NttCfg {
 //    val FastModLatency = 4
     val BfuRegisterInput = 1
     val BfuRegisterOutput = 1
-    val pathMultIP = s"/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/mult_w${M}_${device}.xcix"
+    val pathMultIP = s"/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/mult_w${dspWidth}_${device}.xcix"
   }
 
   case class ArbitParamCfg() {
@@ -83,18 +83,9 @@ object NttCfg {
       nttSimPublic: Boolean = true
   ) {
     val radix = 2
-
     val useBramIP = false
     val useMulIP = true
     val useTwFile = true
-//    val nttSimPublic = true
-
-//    val AddSubLatencyIntt = Bfu.AddSubLatencyIntt // add&sub + rescale
-//    val AddSubLatencyNtt = Bfu.AddSubLatencyNtt // add&sub
-//    val MultLatency = Bfu.MultLatency
-//    val FastModLatency = Bfu.FastModLatency
-//    val BfuRegisterInput = Bfu.BfuRegisterInput
-//    val BfuRegisterOutput = Bfu.BfuRegisterOutput
 
     val BfuLatencySt1 = Bfu.AddSubLatencyIntt
     val BfuLatencySt2 = Bfu.MultLatency + Bfu.FastModLatency
@@ -102,12 +93,6 @@ object NttCfg {
     val BfuInttDelay = Bfu.AddSubLatencyIntt + Bfu.MultLatency + Bfu.FastModLatency
     val BfuRegisterIoDelay = Bfu.BfuRegisterInput + Bfu.BfuRegisterOutput
 
-//    val DecodeCalLatency = 1 // addrori -> bankidx & bankaddr
-//    val DecodeMuxRegLatency = 1 // mux -> register -> out
-//    val DecodeLatency = DecodeCalLatency + DecodeMuxRegLatency
-//    val ramLatency = 1
-//    val romMuxLatency = 1
-//    val DatDeMuxLatency = 1 // addrdecode -> mem -> datademux -> bfu
     val addrNttLoopLatency = Arbit.ramLatency + BfuNttDelay + BfuRegisterIoDelay
     val addrInttLoopLatency = Arbit.ramLatency + BfuInttDelay + BfuRegisterIoDelay
     val bfuValidLoopNttLatency = addrNttLoopLatency + Arbit.DecodeLatency + Arbit.DatDeMuxLatency
@@ -124,6 +109,7 @@ object NttCfg {
     val delta = P.delta
     val pGroup = P.pGroup
     val BI = 2 * paraNum
+    val counter = nttPoint / BI
     val Log2NttPoints = log2Up(nttPoint)
     val BankIndexWidth = log2Up(BI)
     val BankAddrWidth = Log2NttPoints - BankIndexWidth
@@ -135,6 +121,7 @@ object NttCfg {
     val twFilePath = s"/PRJ/SpinalHDL-prj/PRJ/py/nwc_ntt_python/data/tw${nttPoint}p${paraNum}q${P.M}_${P.N}.txt"
     val twData: Seq[BigInt] = tools.readData(twFilePath)
     val initTableCompress = tools.wordCat(initTable, paraNum, width)
+
 
     val family = Bfu.device match {
       case "v7"  => "Virtex 7"
@@ -153,6 +140,30 @@ object NttCfg {
     val isOutSideRead = Bool()
     val isOutSideWrite = Bool()
   }
+
+  def driveCtrl(that: CtrlBus,cmd:Bits): Unit = {
+
+
+    require(cmd.getWidth == 4)
+    that.isNtt := cmd(3)
+    that.isCal := cmd(2)
+    that.isOutSideRead := cmd(1)
+    that.isOutSideWrite := cmd(0)
+  }
+
+
+//
+//  case class ctrlTest() extends Component{
+//    val ctrlBus = CtrlBus()
+//    val ctrlBits = Bits(4 bits)
+//    ctrlBits := B"4'b1010"
+//    ctrlBus.assign(ctrlBits)
+//    println(s"isNtt : ${if (ctrlBus.isNtt == True){1} else {0}}")
+//    println(s"isCal : ${if (ctrlBus.isCal == True){1} else {0}}")
+//    println(s"isOutSideRead : ${if (ctrlBus.isOutSideRead == True){1} else {0}}")
+//    println(s"isOutSideWrite : ${if (ctrlBus.isOutSideWrite == True){1} else {0}}")
+//  }
+
 
   case class BfuPayload(g: NttCfgParam) extends Bundle {
     val A = UInt(g.width bits)
@@ -184,6 +195,7 @@ object NttCfg {
   }
 
 }
+
 
 object test {
   def main(args: Array[String]): Unit = {
