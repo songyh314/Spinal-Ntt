@@ -68,7 +68,7 @@ case class twRom(g: NttCfgParam) extends Component {
   val rom = Mem(
     Bits(g.twWidth bits),
     initialContent =
-      if (g.useTwFile) { g.twData.map(B(_, g.twWidth bits))}
+      if (g.mode.useTwFile) { g.twData.map(B(_, g.twWidth bits))}
       else { g.initTableCompress.map(B(_, g.twWidth bits)) }
   )
   val muxReg = RegNextWhen(io.twBus.payload.twMux, io.twBus.valid)

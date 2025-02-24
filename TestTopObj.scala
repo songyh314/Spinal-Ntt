@@ -47,7 +47,7 @@ object TestTopSimFlow extends App {
 }
 
 object TestTopVivadoFlow extends App {
-  val g = NttCfgParam(P= PrimeCfg(24,14),Bfu = BfuParamCfg(24,"9eg",spiltMul = false),nttPoint = 1024, paraNum = 4, nttSimPublic = false)
+  val g = NttCfgParam(P= PrimeCfg(24,14),Bfu = BfuParamCfg(24,"9eg",spiltMul = false),nttPoint = 1024, paraNum = 4, mode = modeCfg(nttSimPublic = false))
   SpinalConfig(
     mode = Verilog,
     nameWhenByFile = false,

@@ -231,9 +231,8 @@ case class shuffleOpt(g: NttCfgParam) extends Component {
     ch3.io.muxIn := muxDrive(Seq(3, 6, 7), decTmp)
     ch7.io.muxIn := muxDrive(Seq(3, 6, 7), decTmp)
     io.idxShuffle(3) := RegNext(ch3.io.muxOut); io.idxShuffle(7) := RegNext(ch7.io.muxOut)
-  } else { null }
-
-  if (g.paraNum == 8) {
+  }
+  else if (g.paraNum == 8) {
     val ch0 = new sfMuxp8ch0_8(g.BankIndexWidth, 0, Seq(0, 1, 8))
     val ch8 = new sfMuxp8ch0_8(g.BankIndexWidth, 8, Seq(0, 1, 8))
     ch0.io.muxIn := muxDrive(Seq(0, 1, 8), decTmp)
@@ -290,6 +289,15 @@ case class shuffleOpt(g: NttCfgParam) extends Component {
     io.idxShuffle(7) := RegNext(ch7.io.muxOut)
     io.idxShuffle(15) := RegNext(ch15.io.muxOut)
   }
+  else {
+    val sfSeq = genSfSeq(g.paraNum)
+    val tmpSeq = Vec (UInt(g.BankIndexWidth bits), g.BI)
+    tmpSeq.zip(sfSeq.zipWithIndex).map{ case(t1,(muxSeq,id)) =>
+      t1 := applySf(decTmp,muxSeq,id)
+    }
+    io.idxShuffle := RegNext(tmpSeq)
+  }
+
 
 }
 
@@ -301,7 +309,7 @@ object shuffleOptGenv extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new shuffleOpt(NttCfgParam()))
+  ).generate(new shuffleOpt(NttCfgParam(nttPoint = 4096,paraNum = 16)))
 }
 
 case class idxDecodeUnit(g: NttCfgParam) extends Component {
@@ -360,7 +368,7 @@ object idxDecodeGenV extends App {
   ).generate(new idxDecode(NttCfgParam()))
 }
 
-case class memInMux(g: NttCfgParam) extends Component {
+case class memInMux(g: NttCfgParam,prefix:String = "") extends Component {
   val io = new Bundle {
     val dataIn = in Vec (Bits(g.width bits), g.BI)
     val idxIn = in Vec (UInt(g.BankIndexWidth bits), g.BI)
@@ -411,7 +419,8 @@ case class memInMux(g: NttCfgParam) extends Component {
     ch7.io.sel := idxIn(7)
     io.dataOut(7) := ch7.io.muxOut.setName("ch7")
 
-  } else if (g.paraNum == 8) {
+  }
+  else if (g.paraNum == 8) {
 
     val ch0 = Mux3ch0_8p8(g.width)
     val ch8 = Mux3ch0_8p8(g.width)
@@ -477,12 +486,19 @@ case class memInMux(g: NttCfgParam) extends Component {
     ch15.io.muxIn := muxDrive(Seq(7, 14, 15), dataIn)
     dataOut(7) := ch7.io.muxOut; dataOut(15) := ch15.io.muxOut
 
-  } else { null }
-
+  }
+  else {
+    val sfSeq = genSfSeq(g.paraNum)
+    val tmpMux = Vec (Bits(g.width bits), g.BI)
+    tmpMux.zip(sfSeq.zipWithIndex).map {case(t1,(mSeq,id)) =>
+      t1 := applyMux(io.dataIn,mSeq,io.idxIn(id),id,prefix)
+    }
+    io.dataOut := (tmpMux)
+  }
 }
 object memInMux {
-  def apply(dataIn: Vec[Bits], idx: Vec[UInt], g: NttCfgParam): Vec[Bits] = {
-    val dut = new memInMux(g)
+  def apply(dataIn: Vec[Bits], idx: Vec[UInt], g: NttCfgParam,prefix:String): Vec[Bits] = {
+    val dut = new memInMux(g,prefix)
     dut.io.dataIn := dataIn
     dut.io.idxIn := idx
     dut.io.dataOut
@@ -495,7 +511,7 @@ object memInMuxGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new memInMux(NttCfgParam()))
+  ).generate(new memInMux(NttCfgParam(paraNum = 16)))
 }
 
 case class memInArb(g: NttCfgParam) extends Component {
@@ -520,7 +536,7 @@ case class memInArb(g: NttCfgParam) extends Component {
 //  val bankIdx = idxDecode(addr = io.addrOri, idx = io.idxOri, g = g) // Register 1 cyc
 //  val shuffleIdx = idxShuffle(dataIn = bankIdx)
 //  io.dataMem := RegNext(memInMux(dataIn = RegNext(io.dataOri), idx = shuffleIdx, g = g)) // Register 1 cyc, total 2 cyc in -> out
-  io.dataMem := (memInMux(dataIn = RegNext(io.dataOri), idx = shuffleIdx, g = g))
+  io.dataMem := (memInMux(dataIn = RegNext(io.dataOri), idx = shuffleIdx, g = g,prefix = "memIn_"))
   io.bankIdxTrans := RegNext(bankIdx) // 2cyc idxori -> bankidxtrans, assign with datamem
   io.shuffleIdxTrans := RegNext(shuffleIdx) // 2cyc idxori -> shuffleidxtrans, assign with datamem
 
@@ -562,7 +578,7 @@ case class memWritebackArb(g: NttCfgParam) extends Component {
   val idx = io.isNtt ? idxDelaySt1 | idxDelaySt2
   io.addrWbMem := io.isNtt ? addrDelaySt1 | addrDelaySt2
 
-  io.dataWbMem := (memInMux(dataIn = (io.dataWb), idx = idx, g = g))
+  io.dataWbMem := (memInMux(dataIn = (io.dataWb), idx = idx, g = g,prefix = "memWb_"))
 //  io.dataWbMem := RegNext(memInMux(dataIn = (io.dataWb), idx = idx, g = g))
   io.addrWbSelMem.zip(idx).foreach { case (t1, t2) => t1 := t2.lsb }
 }
@@ -625,7 +641,8 @@ case class memOutArb(g: NttCfgParam) extends Component {
     ch7.io.muxIn := muxDrive(Seq(3, 7), dataMem)
     ch7.io.sel := idx(7).msb
     dataOrder(7) := ch7.io.muxOut
-  } else if (g.paraNum == 8) {
+  }
+  else if (g.paraNum == 8) {
 
     val ch0 = new dataMux2ch0_15p8(g.width)
     ch0.io.sel := idx(0)
@@ -707,7 +724,15 @@ case class memOutArb(g: NttCfgParam) extends Component {
     ch15.io.muxIn := muxDrive(Seq(7, 15), dataMem)
     io.dataOrder(15) := ch15.io.muxOut
 
-  } else { null }
+  }
+  else {
+    val dmuxSeq = genMuxSeq(g.paraNum)
+    val tmpSeq = cloneOf(io.dataOrder)
+    tmpSeq.zip(dmuxSeq.zipWithIndex).map{case(t1,(mseq,id)) =>
+      t1 := applyMux(io.dataMem,mseq,io.idx(id),id,"data")
+    }
+    io.dataOrder := tmpSeq
+  }
 }
 object memOutArb {
   def apply(dataIn: Vec[Bits], idx: Vec[UInt], g: NttCfgParam): Vec[Bits] = {
@@ -725,7 +750,7 @@ object memOutArbGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new memOutArb(NttCfgParam()))
+  ).generate(new memOutArb(NttCfgParam(paraNum = 16)))
 }
 
 case class memForwardCtrl(g: NttCfgParam) extends Component {
@@ -788,7 +813,7 @@ object memForwardCtrlGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new memForwardCtrl(NttCfgParam()))
+  ).generate(new memForwardCtrl(NttCfgParam(paraNum = 16)))
 }
 
 case class memBackwardCtrl(g: NttCfgParam) extends Component {
@@ -812,7 +837,7 @@ object memBackwardCtrlGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new memBackwardCtrl(NttCfgParam()))
+  ).generate(new memBackwardCtrl(NttCfgParam(paraNum = 16)))
 }
 
 case class DataPathTop(g: NttCfgParam) extends Component {

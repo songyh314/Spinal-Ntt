@@ -58,9 +58,9 @@ case class NttTop(g: NttCfgParam, debug: Boolean = false) extends Component {
     val outsideRdDataArray = master Flow Vec(Bits(g.width bits), g.BI)
     val outsideWrDataArray = slave Flow Vec(Bits(g.width bits), g.BI)
 
-    val bfuOut = if (g.nttSimPublic) { Array.fill(g.paraNum)(master Flow (DataPayload(g))) }
+    val bfuOut = if (g.mode.nttSimPublic) { Array.fill(g.paraNum)(master Flow (DataPayload(g))) }
     else { null }
-    val bfuIn = if (g.nttSimPublic) { Array.fill(g.paraNum)(master Flow (BfuPayload(g))) }
+    val bfuIn = if (g.mode.nttSimPublic) { Array.fill(g.paraNum)(master Flow (BfuPayload(g))) }
     else { null }
   }
   noIoPrefix()
@@ -76,7 +76,7 @@ case class NttTop(g: NttCfgParam, debug: Boolean = false) extends Component {
   bfuArray.io.isNtt := io.ctrl.isNtt
   bfuArray.io.dataIn.toSeq.zip(ctrlMem.io.NttPayload.toSeq).foreach { case (t1, t2) => t1 := (t2) }
   ctrlMem.io.NttWriteBack.toSeq.zip(bfuArray.io.dataOut.toSeq).foreach { case (t1, t2) => t1 := (t2) }
-  if (g.nttSimPublic) {
+  if (g.mode.nttSimPublic) {
     io.bfuOut.toSeq.zip(bfuArray.io.dataOut.toSeq).foreach { case (t1, t2) => t1 := t2 }
     io.bfuIn.toSeq.zip(ctrlMem.io.NttPayload.toSeq).foreach { case (t1, t2) => t1 := t2 }
   }

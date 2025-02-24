@@ -43,7 +43,7 @@ object SeqMuxGenV extends App {
 
 
 case class twMux(num: Int) extends Component {
-  assert(isPow2(num) && (num != 1), "tw num should be power of 2 and should not be 1")
+//  assert(isPow2(num) && (num != 1), "tw num should be power of 2 and should not be 1")
   val width = log2Up(num)
   val io = new Bundle {
     val constSeq = in Bits (width bits)

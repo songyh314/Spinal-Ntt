@@ -18,14 +18,14 @@ object CtrlOptAddrGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/Ctrl",
     genLineComments = true
-  ).generate(new CtrlOptAddr(NttCfgParam(paraNum = 32, debug = false)))
+  ).generate(new CtrlOptAddr(NttCfgParam(paraNum = 32)))
 }
 
 
 
 object CtrlOptAddrSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim").compile(new CtrlOptAddr(NttCfgParam(nttPoint = 128, paraNum = 4)))
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim").compile(new CtrlOptAddr(NttCfgParam(nttPoint = 128, paraNum = 1)))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)

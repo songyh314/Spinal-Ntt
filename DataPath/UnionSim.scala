@@ -169,7 +169,7 @@ object ctrlpath_datapath_unionSim extends App {
   val period = 10
   val dut = SimConfig.withXSim.withWave
     .workspacePath("./NttOpt/sim/UnionSim")
-    .compile(new ctrlpath_datapath_union(NttCfgParam(nttPoint = 128, paraNum = 4)))
+    .compile(new ctrlpath_datapath_union(NttCfgParam(nttPoint = 128, paraNum = 16,mode = modeCfg(debug = false, nttSimPublic = false, useTwFile = false))))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(4000 * period)

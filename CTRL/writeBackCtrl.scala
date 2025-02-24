@@ -106,7 +106,7 @@ object writeBackCtrlGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "./rtl/Ntt/CtrlPath/",
     genLineComments = true
-  ).generate(new writeBackCtrl(NttCfgParam(paraNum = 4, debug = false)))
+  ).generate(new writeBackCtrl(NttCfgParam(paraNum = 4)))
 }
 object writeBackCtrlVivadoFlow extends App {
   val workspace = "./vivado_prj/Ntt/Ctrl/writeBackCtrl"

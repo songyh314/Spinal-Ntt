@@ -1,4 +1,5 @@
 package Ntt
+import Ntt.DataPath.DataDeMux
 import Ntt.NttCfg.NttCfgParam
 import spinal.core._
 import spinal.lib._
@@ -27,12 +28,13 @@ object tools {
     val ret: Seq[BigInt] = source.getLines().map(_.trim).filter(_.nonEmpty).map(BigInt(_)).toSeq
     ret
   }
-
 }
 
 object NttCfg {
 
   case class PrimeCfg(M: Int = 24, N: Int = 14) {
+    val primeList = Seq((14,12),(24,14),(64,32))
+    require(primeList.contains((M,N)),s"prime is not illegal")
     val Prime = BigInt(2).pow(M) - BigInt(2).pow(N) + 1
     val HalfPrime = (Prime + 1) / 2
     val delta = M - N
@@ -44,6 +46,10 @@ object NttCfg {
   }
 
   case class BfuParamCfg(M: Int = 24, device: String = "9eg", spiltMul: Boolean = false) {
+    val widthList = Seq(14,24,64)
+    val deviceList = Seq("9eg","v7")
+    require(widthList.contains(M),"mul's width is illegal")
+    require(deviceList.contains(device),"illegal device")
     val AddSubLatencyIntt = 3 // add&sub + rescale
     val AddSubLatencyNtt = 2 // add&sub
     val dspWidth = if (spiltMul) { M/2 }
@@ -64,28 +70,41 @@ object NttCfg {
     val pathMultIP = s"/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/mult_w${dspWidth}_${device}.xcix"
   }
 
-  case class ArbitParamCfg() {
+  case class ArbitParamCfg(para:Int = 4) {
     val DecodeCalLatency = 1 // addrori -> bankidx & bankaddr
     val DecodeMuxRegLatency = 1 // mux -> register -> out
     val DecodeLatency = DecodeCalLatency + DecodeMuxRegLatency
     val ramLatency = 1
+    val romLatency = if(para >= 16){2} else {1}
     val romMuxLatency = 1
     val DatDeMuxLatency = 1 // addrdecode -> mem -> datademux -> bfu
+    val romDealyLatency = DecodeLatency + DatDeMuxLatency + (ramLatency - romLatency) - romMuxLatency
   }
+
+  case class modeCfg(
+      debug:Boolean = false,
+      nttSimPublic: Boolean = true,
+      useTwFile:Boolean = true
+                    ){}
 
   case class NttCfgParam(
       Bfu: BfuParamCfg = BfuParamCfg(),
       Arbit: ArbitParamCfg = ArbitParamCfg(),
       P: PrimeCfg = PrimeCfg(24, 14),
+      mode:modeCfg = modeCfg(debug = false, nttSimPublic = true, useTwFile = true),
       nttPoint: Int = 1024,
       paraNum: Int = 4,
-      debug: Boolean = false,
-      nttSimPublic: Boolean = true
+//      debug: Boolean = false,
+//      nttSimPublic: Boolean = true,
+//      useTwFile:Boolean = true
   ) {
+    val nttPointList = Seq(512,1024,4096,8192)
+    if (mode.useTwFile) {require(nttPointList.contains(nttPoint),s"only support 512/1024/4096/8192 points")}
+    if (P.M == 14){require(nttPoint <= 1024,"for q=12289, only support 512/1024")}
     val radix = 2
     val useBramIP = false
     val useMulIP = true
-    val useTwFile = true
+//    val useTwFile = true
 
     val BfuLatencySt1 = Bfu.AddSubLatencyIntt
     val BfuLatencySt2 = Bfu.MultLatency + Bfu.FastModLatency
@@ -118,9 +137,11 @@ object NttCfg {
     val twWidth = width * paraNum
 
     val initTable: Seq[BigInt] = Seq.range(0, nttPoint).map(item => BigInt(item))
+
     val twFilePath = s"/PRJ/SpinalHDL-prj/PRJ/py/nwc_ntt_python/data/tw${nttPoint}p${paraNum}q${P.M}_${P.N}.txt"
-    val twData: Seq[BigInt] = tools.readData(twFilePath)
+    lazy val twData: Seq[BigInt] = tools.readData(twFilePath)
     val initTableCompress = tools.wordCat(initTable, paraNum, width)
+
 
 
     val family = Bfu.device match {
@@ -207,6 +228,5 @@ object test {
         println(s"Error reading : ${e.getMessage}")
     }
     val g = new NttCfgParam(nttPoint = 1024, paraNum = 4)
-    print(g.twFilePath)
   }
 }

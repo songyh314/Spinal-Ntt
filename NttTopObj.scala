@@ -17,7 +17,7 @@ import scala.collection.mutable.ArrayBuffer
 
 object NttTopSim extends App {
   val period = 10
-  val cfg = new NttCfgParam(P = PrimeCfg(64,32),Bfu = BfuParamCfg(64,"9eg"),nttPoint = 1024, paraNum = 4)
+  val cfg = new NttCfgParam(P = PrimeCfg(14,12),Bfu = BfuParamCfg(14,"9eg"),nttPoint = 4096, paraNum = 4)
   val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/")
   val dut = SimConfig.withXSim
     .withXilinxDevice("xczu9eg-ffvb1156-2-i")
@@ -186,7 +186,7 @@ object NttTopGenV extends App {
 }
 
 object NttTopVivadoFlow extends App {
-  val g = NttCfgParam(P= PrimeCfg(64,32),Bfu = BfuParamCfg(64,"v7",spiltMul = false),nttPoint = 4096, paraNum = 8, nttSimPublic = false)
+  val g = NttCfgParam(P= PrimeCfg(24,14),Bfu = BfuParamCfg(24,"9eg",spiltMul = false),nttPoint = 4096, paraNum = 16, mode = modeCfg(nttSimPublic = false))
   SpinalConfig(
     mode = Verilog,
     nameWhenByFile = false,

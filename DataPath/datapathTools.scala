@@ -9,7 +9,7 @@ import myTools._
 import spinal.sim.DataType
 
 object DataPathTools {
-  def muxDrive[T <: Data]( num: Seq[Int], dataIn: Vec[T]): Vec[T] = {
+  def muxDrive[T <: Data](num: Seq[Int], dataIn: Vec[T]): Vec[T] = {
     val size = num.size
     val ret = Vec(cloneOf(dataIn.head), size)
     for (i <- 0 until num.size) {
@@ -17,6 +17,129 @@ object DataPathTools {
     }
     ret
   }
+  def genSeq(num: Int): Seq[String] = {
+    val len = log2Up(num)
+    val ret = (0 until (num)).map { item =>
+      val tmp = item.toBinaryString
+      if (tmp.length < len) { "0" * (len - tmp.length) + tmp }
+      else tmp
+    }
+    ret
+  }
+  def flipMsb(s: String): String = {
+    if (s.isEmpty) { s }
+    else {
+      val firstChar = s.head
+      val flippedChar = if (firstChar == '0') { '1' }
+      else { '0' }
+      val ret = flippedChar + s.tail
+      ret
+    }
+  }
+  def insertString(s: String, insert: String = "0"): Seq[String] = {
+    val ret = (0 to s.length).map { i => s.substring(0, i) + insert + s.substring(i) }.toSeq
+//    println(s"$s insert $insert : $ret")
+    ret
+  }
+  def bin2Int(s: String): Int = {
+    Integer.parseInt(s, 2)
+  }
+  def insertAndFlip(s: String): Seq[Seq[Int]] = {
+    val insertedZero = insertString(s, "0")
+    val insertedOne = insertString(s, "1")
+    val flippedZero: Seq[String] = insertedZero ++ (insertedZero map flipMsb)
+    val flippedOne: Seq[String] = insertedOne ++ (insertedOne map flipMsb)
+    val ret: Seq[Seq[Int]] = Seq((flippedZero.distinct map bin2Int).sorted, (flippedOne.distinct map bin2Int).sorted)
+    ret
+  }
+  def findIndex(A: Seq[Seq[Int]]): Seq[Seq[Int]] = {
+    val outerSize = A.size
+    val ret = Array.fill(outerSize)(Seq.empty[Int])
+    A.zipWithIndex.foreach { case (innerSeq, j) =>
+      innerSeq.foreach { i =>
+        ret(i) = ret(i) :+ j
+      }
+    }
+    ret.toSeq
+  }
+  def genMuxSeq(num: Int): Seq[Seq[Int]] = {
+    val strSeq = genSeq(num)
+    val ret = (strSeq map insertAndFlip).flatten
+    ret
+  }
+  def genSfSeq(num: Int): Seq[Seq[Int]] = {
+    val strSeq = genSeq(num)
+    val mux = (strSeq map insertAndFlip).flatten
+    val ret = findIndex(mux)
+    ret
+  }
+
+  case class patternMux(width: Int, selWidth: Int = 3, muxSeq: Seq[Int]) extends Component {
+    val muxSize = muxSeq.size
+    val patternWidth = log2Up(muxSize)
+    val tmpSeq = muxSeq.map { item => U(item, selWidth bits) }
+    val io = new Bundle {
+      val muxIn = in Vec (Bits(width bits), muxSize)
+      val sel = in UInt (selWidth bits)
+      val muxOut = out Bits (width bits)
+    }
+    noIoPrefix()
+    val idx = UInt(patternWidth bits)
+    switch(io.sel) {
+      for (i <- 0 until muxSize) {
+        is(tmpSeq(i)) {
+          io.muxOut := io.muxIn(i)
+        }
+      }
+      default { io.muxOut := io.muxIn(0) }
+    }
+  }
+
+  case class patternSf(sw: Int, expect: Int, id: Seq[Int]) extends Component {
+    val io = new Bundle {
+      val muxIn = in Vec (UInt(sw bits), id.size)
+      val muxOut = out UInt (sw bits)
+    }
+    val const = id.map(U(_, sw bits))
+    val flag = io.muxIn.map { item => item === expect }
+    io.muxOut := MuxOH(flag, const)
+  }
+
+  def applySf(muxOri: Vec[UInt], muxSeq: Seq[Int], expect: Int): UInt = {
+    val dut =
+      new patternSf(muxOri.head.getWidth, expect, muxSeq).setDefinitionName(s"sf_p${(muxOri.size) / 2}_ch${expect}")
+    val chIn = muxDrive(muxSeq, muxOri)
+    dut.io.muxIn := chIn
+    dut.io.muxOut
+  }
+  def applyMux(muxOri: Vec[Bits], muxSeq: Seq[Int], idx: UInt, id: Int, prefix: String = ""): Bits = {
+    val dut =
+      new patternMux(muxOri.head.getWidth, idx.getWidth, muxSeq).setDefinitionName(s"${prefix}mux_p${(muxOri.size) / 2}_ch$id")
+    val chIn = muxDrive(muxSeq, muxOri)
+    dut.io.muxIn := chIn
+    dut.io.sel := idx
+    dut.io.muxOut
+  }
+
+}
+
+object Main extends App {
+  import DataPathTools._
+  val constSeq = genSeq(8)
+  val ret1 = (constSeq map insertAndFlip).flatten
+  val ret2 = findIndex(ret1)
+  println(ret1.mkString("\n"))
+  println(ret2.mkString("\n"))
+}
+
+object patternMuxGenv extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new DataPathTools.patternMux(width = 24, selWidth = 4, muxSeq = Seq(2, 4, 10, 12)))
 }
 
 // mux with 3 input used for ch0/ch4 while para is 4
@@ -96,10 +219,10 @@ case class Mux3ch0_8p8(width: Int, selWidth: Int = 4) extends Component {
   }
   import io._
   switch(io.sel.asBits) {
-    is(B"0000") {muxOut := muxIn(0)}
-    is(B"0001") {muxOut := muxIn(1)}
-    is(B"1000") {muxOut := muxIn(2)}
-    default {muxOut := 0}
+    is(B"0000") { muxOut := muxIn(0) }
+    is(B"0001") { muxOut := muxIn(1) }
+    is(B"1000") { muxOut := muxIn(2) }
+    default { muxOut := 0 }
   }
 }
 
@@ -290,7 +413,7 @@ case class dataMux6ch6p4(width: Int) extends Component {
 case class dataMux2ch0_15p8(width: Int) extends Component {
   val io = new Bundle {
     val muxIn = in Vec (Bits(width bits), 2)
-    val sel = in UInt  (4 bits)
+    val sel = in UInt (4 bits)
     val muxOut = out Bits (width bits)
   }
   import io._
@@ -300,19 +423,19 @@ case class dataMux2ch0_15p8(width: Int) extends Component {
 case class dataMux8ch1p8(width: Int) extends Component {
   val io = new Bundle {
     val muxIn = in Vec (Bits(width bits), 8)
-    val sel = in UInt  (4 bits)
+    val sel = in UInt (4 bits)
     val muxOut = out Bits (width bits)
   }
   import io._
   val muxGroup = muxIn.splitAt(muxIn.size / 2)
   val muxSelLsb = Bits(width bits)
   val muxSelMsb = Bits(width bits)
-  switch(sel(2 downto 0).asBits){
-    is(B"000"){ muxSelLsb := muxGroup._1(0); muxSelMsb := muxGroup._2(0)}
-    is(B"001"){ muxSelLsb := muxGroup._1(1); muxSelMsb := muxGroup._2(1)}
-    is(B"010"){ muxSelLsb := muxGroup._1(2); muxSelMsb := muxGroup._2(2)}
-    is(B"100"){ muxSelLsb := muxGroup._1(3); muxSelMsb := muxGroup._2(3)}
-    default { muxSelLsb := 0; muxSelMsb := 0}
+  switch(sel(2 downto 0).asBits) {
+    is(B"000") { muxSelLsb := muxGroup._1(0); muxSelMsb := muxGroup._2(0) }
+    is(B"001") { muxSelLsb := muxGroup._1(1); muxSelMsb := muxGroup._2(1) }
+    is(B"010") { muxSelLsb := muxGroup._1(2); muxSelMsb := muxGroup._2(2) }
+    is(B"100") { muxSelLsb := muxGroup._1(3); muxSelMsb := muxGroup._2(3) }
+    default { muxSelLsb := 0; muxSelMsb := 0 }
   }
   muxOut := sel.msb ? muxSelMsb | muxSelLsb
 }
@@ -329,19 +452,19 @@ object dataMuxGenv extends App {
 case class dataMux8ch14p8(width: Int) extends Component {
   val io = new Bundle {
     val muxIn = in Vec (Bits(width bits), 8)
-    val sel = in UInt  (4 bits)
+    val sel = in UInt (4 bits)
     val muxOut = out Bits (width bits)
   }
   import io._
   val muxGroup = muxIn.splitAt(muxIn.size / 2)
   val muxSelLsb = Bits(width bits)
   val muxSelMsb = Bits(width bits)
-  switch(sel(2 downto 0).asBits){
-    is(B"011"){ muxSelLsb := muxGroup._1(0); muxSelMsb := muxGroup._2(0)}
-    is(B"101"){ muxSelLsb := muxGroup._1(1); muxSelMsb := muxGroup._2(1)}
-    is(B"110"){ muxSelLsb := muxGroup._1(2); muxSelMsb := muxGroup._2(2)}
-    is(B"111"){ muxSelLsb := muxGroup._1(3); muxSelMsb := muxGroup._2(3)}
-    default { muxSelLsb := 0; muxSelMsb := 0}
+  switch(sel(2 downto 0).asBits) {
+    is(B"011") { muxSelLsb := muxGroup._1(0); muxSelMsb := muxGroup._2(0) }
+    is(B"101") { muxSelLsb := muxGroup._1(1); muxSelMsb := muxGroup._2(1) }
+    is(B"110") { muxSelLsb := muxGroup._1(2); muxSelMsb := muxGroup._2(2) }
+    is(B"111") { muxSelLsb := muxGroup._1(3); muxSelMsb := muxGroup._2(3) }
+    default { muxSelLsb := 0; muxSelMsb := 0 }
   }
   muxOut := sel.msb ? muxSelMsb | muxSelLsb
 }
@@ -349,15 +472,15 @@ case class dataMux8ch14p8(width: Int) extends Component {
 case class dataMux4ch2_13p8(width: Int) extends Component {
   val io = new Bundle {
     val muxIn = in Vec (Bits(width bits), 4)
-    val sel = in UInt  (4 bits)
+    val sel = in UInt (4 bits)
     val muxOut = out Bits (width bits)
   }
   import io._
-  switch(Cat(sel.msb,sel(1))){
-    is(B"00"){muxOut := muxIn(0)}
-    is(B"01"){muxOut := muxIn(1)}
-    is(B"10"){muxOut := muxIn(2)}
-    is(B"11"){muxOut := muxIn(3)}
+  switch(Cat(sel.msb, sel(1))) {
+    is(B"00") { muxOut := muxIn(0) }
+    is(B"01") { muxOut := muxIn(1) }
+    is(B"10") { muxOut := muxIn(2) }
+    is(B"11") { muxOut := muxIn(3) }
   }
 }
 object dataMux4ch2_13p8Genv extends App {
@@ -373,33 +496,33 @@ object dataMux4ch2_13p8Genv extends App {
 case class dataMux4ch4_7_8_11p8(width: Int) extends Component {
   val io = new Bundle {
     val muxIn = in Vec (Bits(width bits), 4)
-    val sel = in UInt  (4 bits)
+    val sel = in UInt (4 bits)
     val muxOut = out Bits (width bits)
   }
   import io._
-  switch(sel(3 downto 2).asBits){
-    is(B"00"){muxOut := muxIn(0)}
-    is(B"01"){muxOut := muxIn(1)}
-    is(B"10"){muxOut := muxIn(2)}
-    is(B"11"){muxOut := muxIn(3)}
+  switch(sel(3 downto 2).asBits) {
+    is(B"00") { muxOut := muxIn(0) }
+    is(B"01") { muxOut := muxIn(1) }
+    is(B"10") { muxOut := muxIn(2) }
+    is(B"11") { muxOut := muxIn(3) }
   }
 }
 
 case class dataMux6ch3_9_10p8(width: Int) extends Component {
   val io = new Bundle {
     val muxIn = in Vec (Bits(width bits), 6)
-    val sel = in UInt  (4 bits)
+    val sel = in UInt (4 bits)
     val muxOut = out Bits (width bits)
   }
   import io._
   val muxGroup = muxIn.splitAt(muxIn.size / 2)
   val muxSelLsb = Bits(width bits)
   val muxSelMsb = Bits(width bits)
-  switch(sel(2 downto 1).asBits){
-    is(B"00"){ muxSelLsb := muxGroup._1(0); muxSelMsb := muxGroup._2(0)}
-    is(B"01"){ muxSelLsb := muxGroup._1(1); muxSelMsb := muxGroup._2(1)}
-    is(B"10"){ muxSelLsb := muxGroup._1(2); muxSelMsb := muxGroup._2(2)}
-    default { muxSelLsb := 0; muxSelMsb := 0}
+  switch(sel(2 downto 1).asBits) {
+    is(B"00") { muxSelLsb := muxGroup._1(0); muxSelMsb := muxGroup._2(0) }
+    is(B"01") { muxSelLsb := muxGroup._1(1); muxSelMsb := muxGroup._2(1) }
+    is(B"10") { muxSelLsb := muxGroup._1(2); muxSelMsb := muxGroup._2(2) }
+    default { muxSelLsb := 0; muxSelMsb := 0 }
   }
   muxOut := sel.msb ? muxSelMsb | muxSelLsb
 }
@@ -407,23 +530,21 @@ case class dataMux6ch3_9_10p8(width: Int) extends Component {
 case class dataMux6ch5_6_12p8(width: Int) extends Component {
   val io = new Bundle {
     val muxIn = in Vec (Bits(width bits), 6)
-    val sel = in UInt  (4 bits)
+    val sel = in UInt (4 bits)
     val muxOut = out Bits (width bits)
   }
   import io._
   val muxGroup = muxIn.splitAt(muxIn.size / 2)
   val muxSelLsb = Bits(width bits)
   val muxSelMsb = Bits(width bits)
-  switch(sel(2 downto 1).asBits){
-    is(B"01"){ muxSelLsb := muxGroup._1(0); muxSelMsb := muxGroup._2(0)}
-    is(B"10"){ muxSelLsb := muxGroup._1(1); muxSelMsb := muxGroup._2(1)}
-    is(B"11"){ muxSelLsb := muxGroup._1(2); muxSelMsb := muxGroup._2(2)}
-    default { muxSelLsb := 0; muxSelMsb := 0}
+  switch(sel(2 downto 1).asBits) {
+    is(B"01") { muxSelLsb := muxGroup._1(0); muxSelMsb := muxGroup._2(0) }
+    is(B"10") { muxSelLsb := muxGroup._1(1); muxSelMsb := muxGroup._2(1) }
+    is(B"11") { muxSelLsb := muxGroup._1(2); muxSelMsb := muxGroup._2(2) }
+    default { muxSelLsb := 0; muxSelMsb := 0 }
   }
   muxOut := sel.msb ? muxSelMsb | muxSelLsb
 }
-
-
 
 case class idxShuffle(idxWidth: Int, n: Int) extends Component {
   val io = new Bundle {
