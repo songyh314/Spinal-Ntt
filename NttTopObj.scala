@@ -17,7 +17,13 @@ import scala.collection.mutable.ArrayBuffer
 
 object NttTopSim extends App {
   val period = 10
-  val cfg = new NttCfgParam(P = PrimeCfg(14,12),Bfu = BfuParamCfg(14,"9eg"),nttPoint = 4096, paraNum = 4)
+  val cfg = new NttCfgParam(
+    P = PrimeCfg(24, 14),
+    Bfu = BfuParamCfg(24, "9eg"),
+    Arbit = ArbitParamCfg(),
+    nttPoint = 1024,
+    paraNum = 16
+  )
   val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/")
   val dut = SimConfig.withXSim
     .withXilinxDevice("xczu9eg-ffvb1156-2-i")
@@ -74,7 +80,9 @@ object NttTopSim extends App {
       val p_new = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/in_new.txt")
       while (flag) {
         if (io.bfuIn(0).valid.toBoolean) {
-          val flatSeq = io.bfuIn.map{item => (item.payload.A.toBigInt,item.payload.B.toBigInt,item.payload.Tw.toBigInt)}
+          val flatSeq = io.bfuIn.map { item =>
+            (item.payload.A.toBigInt, item.payload.B.toBigInt, item.payload.Tw.toBigInt)
+          }
           flatSeq.map(p_new.println)
 
           clockDomain.waitSampling()
@@ -86,7 +94,7 @@ object NttTopSim extends App {
       val p_new = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/out_new.txt")
       while (flag) {
         if (io.bfuOut(0).valid.toBoolean) {
-          val flatSeq = io.bfuOut.map{item => (item.payload.A.toBigInt,item.payload.B.toBigInt)}
+          val flatSeq = io.bfuOut.map { item => (item.payload.A.toBigInt, item.payload.B.toBigInt) }
           flatSeq.map(p_new.println)
 
           clockDomain.waitSampling()
@@ -119,7 +127,9 @@ object NttTopSim extends App {
       while (flag_intt) {
         if (io.bfuIn(0).valid.toBoolean) {
 
-          val flatSeq = io.bfuIn.map{item => (item.payload.A.toBigInt,item.payload.B.toBigInt,(g.Prime.toBigInt - item.payload.Tw.toBigInt))}
+          val flatSeq = io.bfuIn.map { item =>
+            (item.payload.A.toBigInt, item.payload.B.toBigInt, (g.Prime.toBigInt - item.payload.Tw.toBigInt))
+          }
           flatSeq.map(p_new.println)
           clockDomain.waitSampling()
         } else { clockDomain.waitSampling() }
@@ -131,7 +141,7 @@ object NttTopSim extends App {
       val p_new = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/intt_out_new.txt")
       while (flag_intt) {
         if (io.bfuOut(0).valid.toBoolean) {
-          val flatSeq = io.bfuOut.map{item => (item.payload.A.toBigInt,item.payload.B.toBigInt)}
+          val flatSeq = io.bfuOut.map { item => (item.payload.A.toBigInt, item.payload.B.toBigInt) }
           flatSeq.map(p_new.println)
 
           clockDomain.waitSampling()
@@ -182,11 +192,18 @@ object NttTopGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/NttTop1",
     genLineComments = true
-  ).generate(new NttTop(NttCfgParam(P= PrimeCfg(14,12),Bfu = BfuParamCfg(14,"9eg"),nttPoint = 1024, paraNum = 4)))
+  ).generate(new NttTop(NttCfgParam(P = PrimeCfg(14, 12), Bfu = BfuParamCfg(14, "9eg"), nttPoint = 1024, paraNum = 4)))
 }
 
 object NttTopVivadoFlow extends App {
-  val g = NttCfgParam(P= PrimeCfg(24,14),Bfu = BfuParamCfg(24,"9eg",spiltMul = false),nttPoint = 4096, paraNum = 16, mode = modeCfg(nttSimPublic = false))
+  val g = NttCfgParam(
+    P = PrimeCfg(24, 14),
+    Bfu = BfuParamCfg(24, "v7", spiltMul = false),
+    Arbit = ArbitParamCfg(),
+    nttPoint = 4096,
+    paraNum = 16,
+    mode = modeCfg(nttSimPublic = false)
+  )
   SpinalConfig(
     mode = Verilog,
     nameWhenByFile = false,
@@ -217,6 +234,7 @@ object NttTopVivadoFlow extends App {
     )
   }
   val rtl = new Rtl {
+
     /** Name */
     override def getName(): String = "NttTop"
     override def getRtlPaths(): Seq[String] = paths
@@ -225,8 +243,7 @@ object NttTopVivadoFlow extends App {
   println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
 }
 
-
-case class test_Case(){
+case class test_Case() {
   var A = 0
   var B = 0
   var Tw = 0
@@ -235,14 +252,13 @@ object top_test {
   def main(args: Array[String]): Unit = {
     val g = new NttCfgParam()
 
-
     val testArray = Array.fill(8)(new test_Case)
-    for(i <- 0 until 8){
+    for (i <- 0 until 8) {
       testArray(i).A = i
       testArray(i).B = i
       testArray(i).Tw = i
     }
-    val flatseq = testArray.toSeq.map{ item => (item.A.toBigInt, item.B.toBigInt, item.Tw.toBigInt)}
+    val flatseq = testArray.toSeq.map { item => (item.A.toBigInt, item.B.toBigInt, item.Tw.toBigInt) }
     flatseq.mkString("\n")
     println(flatseq)
     val p = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/test.txt")

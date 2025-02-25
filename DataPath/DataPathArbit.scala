@@ -493,7 +493,7 @@ case class memInMux(g: NttCfgParam,prefix:String = "") extends Component {
     tmpMux.zip(sfSeq.zipWithIndex).map {case(t1,(mSeq,id)) =>
       t1 := applyMux(io.dataIn,mSeq,io.idxIn(id),id,prefix)
     }
-    io.dataOut := (tmpMux)
+    io.dataOut := tmpMux
   }
 }
 object memInMux {
@@ -522,7 +522,6 @@ case class memInArb(g: NttCfgParam) extends Component {
 
     val bankIdxTrans = out Vec (UInt(g.BankIndexWidth bits), g.BI)
     val shuffleIdxTrans = out Vec (UInt(g.BankIndexWidth bits), g.BI)
-//    val addrMem = out Vec (UInt(g.BankAddrWidth bits), g.BI)
     val addrSel = out Vec (Bool(), g.BI)
     val addrOri_r1 = out Vec (UInt(g.BankAddrWidth bits), g.radix)
     val dataMem = out Vec (Bits(g.width bits), g.BI)
@@ -542,8 +541,17 @@ case class memInArb(g: NttCfgParam) extends Component {
 
   io.addrSel.zip(shuffleIdx).foreach { case (t1, t2) => t1 := t2.lsb } // 1 cyc earlier than dataMem
   io.addrOri_r1 := RegNext(io.addrOri) // 1 cyc earlier than dataMem
-
 }
+object memInArb{
+  def apply(addrOri:Vec[UInt],idxOri:Vec[UInt],dataOri:Vec[Bits],cfg:NttCfgParam):memInArb = {
+    val inst = new memInArb(cfg)
+    inst.io.addrOri := addrOri
+    inst.io.idxOri := idxOri
+    inst.io.dataOri := dataOri
+    inst
+  }
+}
+
 object memInArbGenV extends App {
   SpinalConfig(
     mode = Verilog,
@@ -862,7 +870,8 @@ case class DataPathTop(g: NttCfgParam) extends Component {
 
   val tw = new Area {
     val rom = new twRom(g)
-    rom.io.twBus := Delay(io.twBus, (g.Arbit.DecodeLatency + g.Arbit.DatDeMuxLatency - g.Arbit.romMuxLatency))
+    rom.io.twBus := Delay(io.twBus, (g.Arbit.romDealyLatency))
+//    rom.io.twBus := Delay(io.twBus, (g.Arbit.DecodeLatency + g.Arbit.DatDeMuxLatency - g.Arbit.romMuxLatency))
       .addAttribute("srl_style", "srl")
   }
 

@@ -67,12 +67,18 @@ case class twRom(g: NttCfgParam) extends Component {
 
   val rom = Mem(
     Bits(g.twWidth bits),
-    initialContent =
-      if (g.mode.useTwFile) { g.twData.map(B(_, g.twWidth bits))}
-      else { g.initTableCompress.map(B(_, g.twWidth bits)) }
+    initialContent = if (g.mode.useTwFile) { g.twData.map(B(_, g.twWidth bits)) }
+    else { g.initTableCompress.map(B(_, g.twWidth bits)) }
   )
-  val muxReg = RegNextWhen(io.twBus.payload.twMux, io.twBus.valid)
-  val readSeq = rom.readSync(io.twBus.payload.twAddr, io.twBus.valid)
+  val muxReg =if(g.Arbit.romLatency == 1) {RegNextWhen(io.twBus.payload.twMux, io.twBus.valid)} else {
+    RegNext(RegNextWhen(io.twBus.payload.twMux, io.twBus.valid))
+  }
+  val readSeq = if (g.Arbit.romLatency == 1) {
+    rom.readSync(io.twBus.payload.twAddr, io.twBus.valid)
+  } else {
+    RegNext(rom.readSync(io.twBus.payload.twAddr, io.twBus.valid))
+  }
+
   val sliceSeq = readSeq.subdivideIn(g.paraNum slices).map(_.asUInt)
   def readMux(sel: UInt): UInt = {
     val ret = RegNext(sliceSeq.read(sel))

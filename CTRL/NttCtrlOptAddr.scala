@@ -147,3 +147,99 @@ case class CtrlOptAddr(g: NttCfgParam) extends Component {
   io.TwBus.payload.twMux.zip(twMuxArray.toSeq).foreach { case (t1, t2) => t1 := RegNext(t2.io.twMuxUnit) }
 }
 
+case class CtrlOptAddrp1(g: NttCfgParam) extends Component {
+  require(g.paraNum == 1)
+  val io = new Bundle {
+    val start = in Bool ()
+    val isNtt = in Bool ()
+    val idle = out Bool ()
+    val RdAddrOri = master Flow Vec(UInt(g.BankAddrWidth bits), g.radix)
+    val TwBus = master Flow (twPayload(
+      addrWidth = g.twAddrWidth,
+      muxWidth = log2Up(g.paraNum),
+      para = g.paraNum
+    ))
+  }
+  val loopCnt = Reg(UInt(log2Up(g.nttPoint / g.BI) bits)) init U(0)
+  val stageCnt = Reg(UInt(log2Up(g.Log2NttPoints) bits)) init U(0)
+  val stageCntCop = g.Log2NttPoints - 1 - stageCnt
+
+  val OH_shifter = Reg(Bits(g.Log2NttPoints bits)) init 0
+  val Thermal_shifter = Reg(Bits(g.Log2NttPoints bits)) init 0
+
+  val constSeq = (0 until g.paraNum).map { U(_, log2Up(g.paraNum) bits) }
+  val mask = Bits(log2Up(g.nttPoint / g.paraNum) bits)
+  val fsm = new StateMachine {
+    //    setEncoding(binaryOneHot)
+    val IDLE = makeInstantEntry()
+    val LOOP = new State
+    IDLE
+      .whenIsActive {
+        when(io.start)(goto(LOOP))
+      }
+    LOOP
+      .onEntry {
+        when(io.isNtt) {
+          OH_shifter.msb := True
+          Thermal_shifter.msb := True
+        } otherwise {
+          OH_shifter.lsb := True
+          Thermal_shifter.lsb := True
+        }
+      }
+      .whenIsActive {
+        when(loopCnt === loopCnt.maxValue) {
+          OH_shifter := io.isNtt ? (OH_shifter |>> 1) | (OH_shifter |<< 1)
+          Thermal_shifter := io.isNtt ? (B"1'b1" ## Thermal_shifter(Thermal_shifter.high downto 1)) | (Thermal_shifter(
+            Thermal_shifter.high - 1 downto 0
+          ) ## B"1'b1")
+        }
+        when(loopCnt === loopCnt.maxValue) {
+          loopCnt := U(0)
+        } otherwise (loopCnt := loopCnt + 1)
+        when(loopCnt === loopCnt.maxValue) {
+          when(stageCnt === (g.Log2NttPoints - 1)) { goto(IDLE) } otherwise { stageCnt := stageCnt + 1 }
+        }
+      }
+    when(isNext(IDLE)) {
+      loopCnt := 0; stageCnt := 0;
+      OH_shifter := 0; Thermal_shifter := 0
+    }
+  }
+
+  val subDut = new Area {
+    val MsbPadLoopCnt = (B"1'b0" ## loopCnt(loopCnt.high downto 1)).asBits
+    val LsbPadLoopCnt = loopCnt.asBits
+    val msbMux = new SeqMux(g.Log2NttPoints - log2Up(g.BI))
+    msbMux.io.SeqA := MsbPadLoopCnt
+    msbMux.io.SeqB := LsbPadLoopCnt
+    msbMux.io.isNtt := io.isNtt
+    msbMux.io.ohSeq := OH_shifter(OH_shifter.high downto 1)
+    msbMux.io.thermalSeq := Thermal_shifter(Thermal_shifter.high downto 1)
+
+    val ins0_Msb = msbMux.io.ins0_seq
+    val ins1_Msb = msbMux.io.ins1_seq
+
+  }
+  import subDut._
+  val twGen = new Area {
+    val loopCntShiftNtt = UInt(loopCnt.getWidth + 1 bits)
+    val loopCntShiftIntt = UInt(loopCnt.getWidth + 1 bits)
+    loopCntShiftIntt := (Cat((B"1'b0" #* log2Up(g.BI)), loopCnt).asUInt |>> stageCnt).resized
+    loopCntShiftNtt := (Cat((B"1'b1" #* log2Up(g.BI)), loopCnt).asUInt |>> stageCntCop).resized
+    val tmpMask = Cat(B"1'b0",Thermal_shifter)
+    mask := io.isNtt ? tmpMask(0, log2Up(g.nttPoint / g.paraNum) bits).reversed | tmpMask(
+      1,
+      log2Up(g.nttPoint / g.paraNum) bits
+    ).reversed
+    val twAddr = io.isNtt ? (mask & loopCntShiftNtt.asBits) | ~(mask | loopCntShiftIntt.asBits)
+
+  }
+  import twGen._
+
+  io.idle := fsm.isActive(fsm.IDLE)
+  io.RdAddrOri.payload      := RegNext(Vec(ins0_Msb.asUInt,ins1_Msb.asUInt))
+  io.RdAddrOri.valid        := RegNext(fsm.isActive(fsm.LOOP))
+  io.TwBus.payload.twAddr   := RegNext(twAddr.asUInt)
+  io.TwBus.valid            := RegNext(fsm.isActive(fsm.LOOP))
+}
