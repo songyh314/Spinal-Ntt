@@ -20,21 +20,13 @@ object CtrlOptAddrGenV extends App {
     genLineComments = true
   ).generate(new CtrlOptAddr(NttCfgParam(paraNum = 1)))
 }
-object CtrlOptAddrp1GenV extends App {
-  SpinalConfig(
-    mode = Verilog,
-    nameWhenByFile = false,
-    anonymSignalPrefix = "tmp",
-    targetDirectory = "NttOpt/rtl/Ctrl",
-    genLineComments = true
-  ).generate(new CtrlOptAddrp1(NttCfgParam(paraNum = 1)))
-}
+
 
 
 
 object CtrlOptAddrSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim").compile(new CtrlOptAddrp1(NttCfgParam(nttPoint = 128, paraNum = 1,mode = modeCfg(useTwFile = false))))
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim").compile(new CtrlOptAddr(NttCfgParam(nttPoint = 128, paraNum = 1,mode = modeCfg(useTwFile = false))))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)
@@ -57,6 +49,7 @@ object CtrlOptAddrSim extends App {
     simSuccess()
   }
 }
+
 
 
 object CtrlOptAddrVivadoFlow extends App {

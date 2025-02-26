@@ -70,21 +70,36 @@ case class twRom(g: NttCfgParam) extends Component {
     initialContent = if (g.mode.useTwFile) { g.twData.map(B(_, g.twWidth bits)) }
     else { g.initTableCompress.map(B(_, g.twWidth bits)) }
   )
-  val muxReg =if(g.Arbit.romLatency == 1) {RegNextWhen(io.twBus.payload.twMux, io.twBus.valid)} else {
-    RegNext(RegNextWhen(io.twBus.payload.twMux, io.twBus.valid))
+  val foo = if (g.paraNum > 1){
+    new Area {
+      val muxReg = if(g.Arbit.romLatency == 1) {RegNextWhen(io.twBus.payload.twMux, io.twBus.valid)} else {
+        RegNext(RegNextWhen(io.twBus.payload.twMux, io.twBus.valid))
+      }
+      val readSeq = if (g.Arbit.romLatency == 1) {
+        rom.readSync(io.twBus.payload.twAddr, io.twBus.valid)
+      } else {
+        RegNext(rom.readSync(io.twBus.payload.twAddr, io.twBus.valid))
+      }
+
+      val sliceSeq = readSeq.subdivideIn(g.paraNum slices).map(_.asUInt)
+      def readMux(sel: UInt): UInt = {
+        val ret = RegNext(sliceSeq.read(sel))
+        ret
+      }
+      io.twData.zip(muxReg).foreach { case (t1, t2) => t1 := readMux(t2) }
+    }
   }
-  val readSeq = if (g.Arbit.romLatency == 1) {
-    rom.readSync(io.twBus.payload.twAddr, io.twBus.valid)
-  } else {
-    RegNext(rom.readSync(io.twBus.payload.twAddr, io.twBus.valid))
+  else if (g.paraNum == 1){
+    new Area {
+      val readSeq = if (g.Arbit.romLatency == 1) {
+        rom.readSync(io.twBus.payload.twAddr, io.twBus.valid)
+      } else {
+        RegNext(rom.readSync(io.twBus.payload.twAddr, io.twBus.valid))
+      }
+      io.twData := Vec(readSeq.asUInt)
+    }
   }
 
-  val sliceSeq = readSeq.subdivideIn(g.paraNum slices).map(_.asUInt)
-  def readMux(sel: UInt): UInt = {
-    val ret = RegNext(sliceSeq.read(sel))
-    ret
-  }
-  io.twData.zip(muxReg).foreach { case (t1, t2) => t1 := readMux(t2) }
 }
 object twRomGenV extends App {
   SpinalConfig(mode = Verilog, targetDirectory = "NttOpt/rtl/DataPath/rom").generate(

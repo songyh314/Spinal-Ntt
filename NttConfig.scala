@@ -80,7 +80,7 @@ object NttCfg {
     val romLatency = 1
     val romMuxLatency = 1
     val DatDeMuxLatency = 1 // addrdecode -> mem -> datademux -> bfu
-    val romDealyLatency = DecodeLatency + DatDeMuxLatency + ramLatency - romLatency - romMuxLatency
+//    val romDealyLatency = DecodeLatency + DatDeMuxLatency + ramLatency - romLatency - romMuxLatency
   }
 
   case class modeCfg(
@@ -123,6 +123,11 @@ object NttCfg {
     } else {
       bfuValidLoopNttLatency
     }
+    val romDealyLatency = if (paraNum > 1) {
+      Arbit.DecodeLatency + Arbit.DatDeMuxLatency + Arbit.ramLatency - Arbit.romLatency - Arbit.romMuxLatency
+    } else if (paraNum == 1) {
+      Arbit.DecodeLatency + Arbit.DatDeMuxLatency + Arbit.ramLatency - Arbit.romLatency
+    } else { 0 }
 
     val width = P.M
     val Prime = P.Prime
@@ -171,17 +176,7 @@ object NttCfg {
     that.isOutSideWrite := cmd(0)
   }
 
-//
-//  case class ctrlTest() extends Component{
-//    val ctrlBus = CtrlBus()
-//    val ctrlBits = Bits(4 bits)
-//    ctrlBits := B"4'b1010"
-//    ctrlBus.assign(ctrlBits)
-//    println(s"isNtt : ${if (ctrlBus.isNtt == True){1} else {0}}")
-//    println(s"isCal : ${if (ctrlBus.isCal == True){1} else {0}}")
-//    println(s"isOutSideRead : ${if (ctrlBus.isOutSideRead == True){1} else {0}}")
-//    println(s"isOutSideWrite : ${if (ctrlBus.isOutSideWrite == True){1} else {0}}")
-//  }
+
 
   case class BfuPayload(g: NttCfgParam) extends Bundle {
     val A = UInt(g.width bits)
