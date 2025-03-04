@@ -18,11 +18,11 @@ import scala.collection.mutable.ArrayBuffer
 object NttTopSim extends App {
   val period = 10
   val cfg = new NttCfgParam(
-    P = PrimeCfg(24, 14),
-    Bfu = BfuParamCfg(24, "9eg"),
+    P = PrimeCfg(32, 20),
+    Bfu = BfuParamCfg(32, "9eg"),
     Arbit = ArbitParamCfg(),
     nttPoint = 1024,
-    paraNum = 1
+    paraNum = 16
   )
   val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/")
   val dut = SimConfig.withXSim
@@ -365,10 +365,10 @@ object NttTopGenV extends App {
 
 object NttTopVivadoFlow extends App {
   val g = NttCfgParam(
-    P = PrimeCfg(24, 14),
-    Bfu = BfuParamCfg(24, "v7", spiltMul = false),
+    P = PrimeCfg(32, 20),
+    Bfu = BfuParamCfg(32, "v7", spiltMul = false),
     Arbit = ArbitParamCfg(),
-    nttPoint = 4096,
+    nttPoint = 1024,
     paraNum = 16,
     mode = modeCfg(nttSimPublic = false)
   )

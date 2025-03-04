@@ -1,6 +1,6 @@
 package Ntt.BFU
 
-import Ntt.NttCfg.{BfuParamCfg, NttCfgParam, PrimeCfg}
+import Ntt.NttCfg.{BfuParamCfg, NttCfgParam, PrimeCfg, modeCfg}
 import org.scalatest.funsuite.AnyFunSuite
 import spinal.core._
 import spinal.core.sim._
@@ -70,9 +70,9 @@ object FastModSim extends App {
 }
 
 object FastMod_sim extends App {
-
-  val cfg = NttCfgParam(P = PrimeCfg(64, 32), Bfu = BfuParamCfg(64, "9eg"))
-  class FastMod_simEnv() extends FastMod6432(cfg) {
+  val Prime = new PrimeCfg(32, 20)
+  val cfg = NttCfgParam(P = Prime, Bfu = BfuParamCfg(32, "9eg"),mode = modeCfg(useTwFile = false))
+  class FastMod_simEnv() extends FastMod3220(cfg) {
     val drvQueue = mutable.Queue[BigInt]()
     val drvMon = mutable.Queue[BigInt]()
     val refQueue = mutable.Queue[BigInt]()
@@ -162,18 +162,16 @@ object FastMod_sim extends App {
       drvMon.enqueue(test)
     }
   }
-  val dut = SimConfig.withXSim.withWave.workspacePath("NttOpt/sim/Bfu/FastMod6432" ).compile(new FastMod_simEnv())
+  val dut = SimConfig.withXSim.withWave.workspacePath("NttOpt/sim/Bfu/FastMod" ).compile(new FastMod_simEnv())
   val period = 10
   dut.doSim("test") { dut =>
-    SimTimeout(1000 * period ns)
-    val Prime = new PrimeCfg(64, 32)
     val max = (Prime.Prime - 1).pow(2)
     import dut._
     clockDomain.forkStimulus(period ns)
     simEnvStart()
     io.dataIn.valid #= false
     clockDomain.waitSampling(10)
-    for (i <- 0 until 64) {
+    for (i <- 0 until 4096) {
       val randomTest = BigInt(max.bitLength, Random) % (max - Prime.Prime) + Prime.Prime
       //      println(randomTest)
       insertData(randomTest)

@@ -33,7 +33,7 @@ object tools {
 object NttCfg {
 
   case class PrimeCfg(M: Int = 24, N: Int = 14) {
-    val primeList = Seq((14, 12), (24, 14), (64, 32))
+    val primeList = Seq((14, 12), (24, 14), (32, 20), (64, 32))
     require(primeList.contains((M, N)), s"prime is not illegal")
     val Prime = BigInt(2).pow(M) - BigInt(2).pow(N) + 1
     val HalfPrime = (Prime + 1) / 2
@@ -46,7 +46,7 @@ object NttCfg {
   }
 
   case class BfuParamCfg(M: Int = 24, device: String = "9eg", spiltMul: Boolean = false) {
-    val widthList = Seq(14, 24, 64)
+    val widthList = Seq(14, 24, 32, 64)
     val deviceList = Seq("9eg", "v7")
     require(widthList.contains(M), "mul's width is illegal")
     require(deviceList.contains(device), "illegal device")
@@ -54,16 +54,16 @@ object NttCfg {
     val AddSubLatencyNtt = 2 // add&sub
     val dspWidth = if (spiltMul) { M / 2 }
     else { M }
-    val MultLatency = M match {
+    val MultLatency = dspWidth match {
       case 14 => 3
       case 24 => 4
-      case 64 =>
-        if (spiltMul) { 8 }
-        else { 18 }
+      case 32 => 6
+      case 64 => 18
     }
     val FastModLatency = M match {
       case 14 => 4
       case 24 => 4
+      case 32 => 4
       case 64 => 3
     }
 //    val FastModLatency = 4
@@ -175,8 +175,6 @@ object NttCfg {
     that.isOutSideRead := cmd(1)
     that.isOutSideWrite := cmd(0)
   }
-
-
 
   case class BfuPayload(g: NttCfgParam) extends Bundle {
     val A = UInt(g.width bits)

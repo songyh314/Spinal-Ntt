@@ -11,39 +11,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
-object BfuGold extends App {
-  val cfg = new NttCfgParam(P = PrimeCfg(64,32), Bfu = BfuParamCfg(64,"9eg"))
-  val debug = false
-  def AddSub(A: BigInt = 0, B: BigInt = 0, isRescale: Boolean): (BigInt, BigInt) = {
-    var addRes = (A + B) % cfg.Prime
-    var subRes = if (A > B) A - B else (A + cfg.Prime) - B
-    if (isRescale) {
-      if (addRes % 2 == 1) {
-        addRes = addRes / 2 + cfg.HalfPrime
-      } else { addRes = addRes / 2 }
-      if (subRes % 2 == 1) {
-        subRes = subRes / 2 + cfg.HalfPrime
-      } else { subRes = subRes / 2 }
-    }
-    if (debug) println(s"add : $addRes , subu : $subRes")
-    (addRes, subRes)
-  }
-  def ModMult(A: BigInt, B: BigInt): BigInt = {
-    val ret = (A * B) % cfg.Prime
-    if (debug) println(s"modmult res : $ret")
-    ret
-  }
-  def Bfu(A: BigInt, B: BigInt, Tw: BigInt, isNtt: Boolean): (BigInt, BigInt) = {
-    if (isNtt) {
-      val tmpB = ModMult(B, Tw)
-      AddSub(A, tmpB, isRescale = false)
-    } else {
-      val (tmpA, tmpB) = AddSub(A, B, isRescale = true)
-      val invTw = cfg.Prime - Tw
-      (tmpA, ModMult(tmpB, invTw))
-    }
-  }
-}
+
 
 case class DrvData(A: BigInt, B: BigInt, TW: BigInt, isNtt: Boolean)
 case class MonData(A: BigInt, B: BigInt)
@@ -55,7 +23,39 @@ object BfuGenV extends App {
 
 object BfuSimFlow extends App {
 
-  val g = NttCfgParam(P = PrimeCfg(64,32), Bfu = BfuParamCfg(64,"9eg"))
+  val g = NttCfgParam(P = PrimeCfg(32,20), Bfu = BfuParamCfg(32,"9eg"))
+  object BfuGold {
+    val debug = false
+    def AddSub(A: BigInt = 0, B: BigInt = 0, isRescale: Boolean): (BigInt, BigInt) = {
+      var addRes = (A + B) % g.Prime
+      var subRes = if (A > B) A - B else (A + g.Prime) - B
+      if (isRescale) {
+        if (addRes % 2 == 1) {
+          addRes = addRes / 2 + g.HalfPrime
+        } else { addRes = addRes / 2 }
+        if (subRes % 2 == 1) {
+          subRes = subRes / 2 + g.HalfPrime
+        } else { subRes = subRes / 2 }
+      }
+      if (debug) println(s"add : $addRes , subu : $subRes")
+      (addRes, subRes)
+    }
+    def ModMult(A: BigInt, B: BigInt): BigInt = {
+      val ret = (A * B) % g.Prime
+      if (debug) println(s"modmult res : $ret")
+      ret
+    }
+    def Bfu(A: BigInt, B: BigInt, Tw: BigInt, isNtt: Boolean): (BigInt, BigInt) = {
+      if (isNtt) {
+        val tmpB = ModMult(B, Tw)
+        AddSub(A, tmpB, isRescale = false)
+      } else {
+        val (tmpA, tmpB) = AddSub(A, B, isRescale = true)
+        val invTw = g.Prime - Tw
+        (tmpA, ModMult(tmpB, invTw))
+      }
+    }
+  }
   case class BfuSim() extends Bfu(g) {
     val drvQueue = mutable.Queue[DrvData]()
     val drvMon = mutable.Queue[DrvData]()
@@ -151,7 +151,7 @@ object BfuSimFlow extends App {
   val period = 10
   dut.doSim("test") { dut =>
     import dut._
-    val g = NttCfgParam()
+    val g = NttCfgParam(P = PrimeCfg(32,20), Bfu = BfuParamCfg(32,"9eg"))
 //    SimTimeout(5000 * period)
     clockDomain.forkStimulus(period ns)
     simEnvStart()

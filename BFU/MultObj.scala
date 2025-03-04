@@ -15,7 +15,7 @@ object MultSim extends App {
 
   val spinalConfig = SpinalConfig(defaultClockDomainFrequency = FixedFrequency(10 MHz))
   val cfg =
-    new NttCfgParam(P = PrimeCfg(64, 32), Bfu = BfuParamCfg(64, "9eg", spiltMul = true), nttPoint = 1024, paraNum = 4)
+    new NttCfgParam(P = PrimeCfg(32, 20), Bfu = BfuParamCfg(32, "9eg"), nttPoint = 1024, paraNum = 4)
 
   case class MultsimEnv() extends Mult(cfg) {
     case class MultIn(A: BigInt = 0, B: BigInt = 0) {}

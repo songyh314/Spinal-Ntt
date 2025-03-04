@@ -191,6 +191,60 @@ object FastMod6432 {
   }
 }
 
+case class FastMod3220(g: NttCfgParam) extends Component {
+  val prime = g.Prime
+  require(g.P.M == 32 & g.P.N == 20)
+  val io = new Bundle {
+    val dataIn = slave Flow (UInt(2 * g.width bits))
+    val dataOut = master Flow (UInt(g.width bits))
+  }
+  val a0 = io.dataIn.payload(43 downto 32)
+  val a1 = io.dataIn.payload(55 downto 44)
+  val a2 = io.dataIn.payload(63 downto 56)
+  val b0 = io.dataIn.payload(63 downto 32)
+  val b1 = io.dataIn.payload(63 downto 44)
+  val b2 = io.dataIn.payload(63 downto 56)
+  val c = io.dataIn.payload(31 downto 0)
+  // st0
+  val A_sum = a0._data +^ a1._data +^ a2._data
+  val Areg = RegNextWhen(A_sum.resize(14 bits), io.dataIn.valid)
+  val Breg_0 = RegNextWhen(b0._data +^ b1._data, io.dataIn.valid)
+  val Breg_1 = RegNextWhen(b2._data, io.dataIn.valid)
+  val CregSt0 = RegNextWhen(c, io.dataIn.valid)
+  // st1
+  val BregSt1 = RegNext((Breg_0 +^ Breg_1).resize(33 bits))
+  val A_slice0 = Areg(11 downto 0)
+  val A_slice1 = Areg(13 downto 12)
+  val D_sum = (A_slice0 +^ A_slice1).resize(13 bits)
+  val D_slice0 = D_sum(11 downto 0)
+  val D_slice1 = D_sum.msb.asUInt
+  val E_sum = (D_slice0 + D_slice1).resize(12 bits)
+  val E_sub = A_slice1 +^ D_slice1
+  val E_cb = (E_sum << g.P.N) - E_sub
+  val Ereg = RegNext(E_cb)
+  val CregSt1 = RegNext(CregSt0)
+  // st2
+  val BregSt2 = RegNext(BregSt1)
+  val Res1_tmp1 = Ereg +^ CregSt1 - g.Prime
+  val Res1_tmp2 = Ereg +^ CregSt1
+  val Res1_value = (Ereg +^ CregSt1 >= g.Prime) ? Res1_tmp1 | Res1_tmp2
+  val Res1 = RegNext(Res1_value)
+  val Res2_tmp1 = Res1 - BregSt2
+  val Res2_tmp2 = (Res1 +^ g.Prime) - BregSt2
+  val Res2_value = (Res1 >= BregSt2) ? Res2_tmp1 | Res2_tmp2
+  val Res2 = RegNext(Res2_value.resize(g.width bits))
+  io.dataOut.payload := Res2
+  io.dataOut.valid := Delay(io.dataIn.valid, LatencyAnalysis(io.dataIn.payload, io.dataOut.payload))
+}
+object FastMod3220 {
+  def apply(dataIn: Flow[UInt], g: NttCfgParam): Flow[UInt] = {
+    val dut = new FastMod3220(g)
+    dut.io.dataIn := dataIn
+    val ret = dut.io.dataOut
+    ret
+  }
+}
+
 case class BarretMod2414(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val dataIn = slave Flow (UInt(2 * g.width bits))

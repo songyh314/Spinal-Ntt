@@ -34,6 +34,7 @@ class ModMultCluster(g: NttCfgParam) extends Component {
   val ret =  g.P.M match {
     case 14 => FastMod1412(uMult.io.dataOut,g)
     case 24 => FastMod2414(uMult.io.dataOut,g)
+    case 32 => FastMod3220(uMult.io.dataOut,g)
     case 64 => FastMod6432(uMult.io.dataOut,g)
   }
   io.dataOut := ret
