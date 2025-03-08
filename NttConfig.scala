@@ -52,10 +52,13 @@ object NttCfg {
     require(deviceList.contains(device), "illegal device")
     val AddSubLatencyIntt = 3 // add&sub + rescale
     val AddSubLatencyNtt = 2 // add&sub
+    val Karatsuba = true
     val dspWidth = if (spiltMul) { M / 2 }
     else { M }
-    val MultLatency = dspWidth match {
+
+    val DspLatency = dspWidth match {
       case 14 => 3
+      case 16 => 3
       case 24 => 4
       case 32 => 6
       case 64 => 18
@@ -66,10 +69,13 @@ object NttCfg {
       case 32 => 4
       case 64 => 3
     }
+    val MultLatency = if (spiltMul){DspLatency + 3} else {DspLatency}
 //    val FastModLatency = 4
     val BfuRegisterInput = 1
     val BfuRegisterOutput = 1
-    val pathMultIP = s"/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/mult_w${dspWidth}_${device}.xcix"
+    val MultIP = s"/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/mult_w${dspWidth}_${device}.xcix"
+    val signedMultIP = s"/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/mult_w${dspWidth+1}_${device}_s.xcix"
+    val pathMultIP = Seq(MultIP,signedMultIP)
   }
 
   case class ArbitParamCfg() {

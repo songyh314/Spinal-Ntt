@@ -63,7 +63,7 @@ object DataPathTopVivadoFlow extends App {
   val device = "xc7vx485tffg1157-1"
   val frequency = 300 MHz
   val cpu = 16
-  val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mem.xcix"
+  val xcix = Seq("/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mem.xcix")
   val paths = Seq(
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/DataPathTop.v",
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/DataPathTop.v_toplevel_tw_rom_rom.bin",

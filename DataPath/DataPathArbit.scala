@@ -519,6 +519,8 @@ object memInMuxGenV extends App {
   ).generate(new memInMux(NttCfgParam(paraNum = 16)))
 }
 
+
+
 case class memInArb(g: NttCfgParam) extends Component {
   val io = new Bundle {
     val addrOri = in Vec (UInt(g.BankAddrWidth bits), g.radix)
@@ -654,7 +656,8 @@ case class memOutArb(g: NttCfgParam) extends Component {
     ch7.io.muxIn := muxDrive(Seq(3, 7), dataMem)
     ch7.io.sel := idx(7).msb
     dataOrder(7) := ch7.io.muxOut
-  } else if (g.paraNum == 8) {
+  }
+  else if (g.paraNum == 8) {
 
     val ch0 = new dataMux2ch0_15p8(g.width)
     ch0.io.sel := idx(0)
@@ -735,10 +738,12 @@ case class memOutArb(g: NttCfgParam) extends Component {
     ch15.io.sel := idx(15)
     ch15.io.muxIn := muxDrive(Seq(7, 15), dataMem)
     io.dataOrder(15) := ch15.io.muxOut
-  } else if (g.paraNum == 1) {
+  }
+  else if (g.paraNum == 1) {
     io.dataOrder(0) := io.dataMem.read(io.idx(0))
     io.dataOrder(1) := io.dataMem.read(io.idx(1))
-  } else {
+  }
+  else {
     require(isPow2(g.paraNum))
     val dmuxSeq = genMuxSeq(g.paraNum)
     val tmpSeq = cloneOf(io.dataOrder)

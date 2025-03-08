@@ -181,7 +181,7 @@ object BfuVivadoFlow extends App {
   val device = "xczu9eg-ffvb1156-2-i"
   val frequency = 400 MHz
   val cpu = 12
-  val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
+  val xcix = Seq("/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix")
   val paths = Seq(
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/Bfu/Bfu.v",
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v"

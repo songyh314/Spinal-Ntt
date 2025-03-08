@@ -178,7 +178,6 @@ class TestTop(g: NttCfgParam) extends Component {
       Fill.whenIsActive { when(fsm.isActive(fsm.Fin)) { goto(Comp) } }
       Comp.whenIsActive {
         when(resFifo.io.pop.fire && refFifo.io.pop.fire) {
-
           when(resPop.payload =/= refPop.payload) { goto(Error) } elsewhen (pop_cnt === pop_cnt.maxValue) { goto(Pass) }
           pop_cnt := pop_cnt + 1
         }

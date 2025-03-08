@@ -138,7 +138,7 @@ object ModMultVivadoFlow extends App {
   val device = "xczu9eg-ffvb1156-2-i"
   val frequency = 300 MHz
   val cpu = 8
-  val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
+  val xcix = Seq("/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix")
   val paths = Seq(
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/Bfu/ModMult.v",
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mul.v"

@@ -163,6 +163,6 @@ object AddSubVivadoFlow extends App {
     override def getRtlPath(): String = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/Bfu/AddSub.v"
   }
 
-  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu, xcix = rtl.getRtlPath())
+  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu, xcix = Seq(rtl.getRtlPath()))
   println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
 }

@@ -15,7 +15,7 @@ object MultSim extends App {
 
   val spinalConfig = SpinalConfig(defaultClockDomainFrequency = FixedFrequency(10 MHz))
   val cfg =
-    new NttCfgParam(P = PrimeCfg(32, 20), Bfu = BfuParamCfg(32, "9eg"), nttPoint = 1024, paraNum = 4)
+    new NttCfgParam(P = PrimeCfg(32, 20), Bfu = BfuParamCfg(32, "v7",spiltMul = true), nttPoint = 1024, paraNum = 4)
 
   case class MultsimEnv() extends Mult(cfg) {
     case class MultIn(A: BigInt = 0, B: BigInt = 0) {}
@@ -124,8 +124,9 @@ object MultSim extends App {
 
 }
 
+
 object MultGenVerilog extends App {
-  val cfg = new NttCfgParam(P = PrimeCfg(64, 32), Bfu = BfuParamCfg(64, "9eg"), nttPoint = 1024, paraNum = 4)
+  val cfg = new NttCfgParam(P = PrimeCfg(32, 20), Bfu = BfuParamCfg(32, "v7",spiltMul = true), nttPoint = 1024, paraNum = 4)
   SpinalConfig(
     mode = Verilog,
     targetDirectory = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/BFU",
@@ -142,7 +143,7 @@ object MultVivadoFlow extends App {
   val frequency = 300 MHz
   val cpu = 8
 
-  val xcix = "/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix"
+  val xcix = Seq("/PRJ/SpinalHDL-prj/PRJ/myTest/test/hw/spinal/Ntt/xilinx_ip/mult_gen_0.xcix")
   val top = "xMul"
   val paths = Seq(
     "/PRJ/SpinalHDL-prj/PRJ/myTest/test/rtl/Ntt/Mult/xMul.v",

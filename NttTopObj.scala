@@ -19,10 +19,10 @@ object NttTopSim extends App {
   val period = 10
   val cfg = new NttCfgParam(
     P = PrimeCfg(32, 20),
-    Bfu = BfuParamCfg(32, "9eg"),
+    Bfu = BfuParamCfg(32, "v7",spiltMul = true),
     Arbit = ArbitParamCfg(),
-    nttPoint = 1024,
-    paraNum = 16
+    nttPoint = 4096,
+    paraNum = 4
   )
   val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/")
   val dut = SimConfig.withXSim
@@ -185,173 +185,6 @@ object NttTopSim extends App {
   }
 }
 
-//object NttTopP1Sim extends App {
-//  val period = 10
-//  val cfg = new NttCfgParam(
-//    P = PrimeCfg(24, 14),
-//    Bfu = BfuParamCfg(24, "9eg"),
-//    Arbit = ArbitParamCfg(),
-//    nttPoint = 1024,
-//    paraNum = 1
-//  )
-//  val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/")
-//  val dut = SimConfig.withXSim
-//    .withXilinxDevice("xczu9eg-ffvb1156-2-i")
-//    .workspacePath("./NttOpt/sim/")
-//    .withXSimSourcesPaths(path, path)
-//    .withWave
-//    .compile(new NttTopP1(cfg, debug = false))
-//
-//  dut.doSimUntilVoid { dut =>
-//    import dut._
-//    clockDomain.forkStimulus(period ns)
-//
-//    io.start #= false
-//    io.start #= false
-//    io.ctrl.isCal #= false
-//    io.ctrl.isOutSideRead #= false
-//    io.ctrl.isOutSideWrite #= false
-//    io.outsideAddrOri.valid #= false
-//    io.outsideIdxOri.valid #= false
-//    clockDomain.waitSampling(10)
-//
-//    io.ctrl.isOutSideWrite #= true
-//    clockDomain.waitSampling()
-//    val seq1 = Seq.range(0, g.BI).map(item => BigInt(item))
-//    for (i <- 0 until g.nttPoint / g.BI) {
-//      io.outsideAddrOri.valid #= true
-//      io.outsideIdxOri.valid #= true
-//      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
-//      io.outsideAddrOri.payload.foreach(item => item #= i)
-//      clockDomain.waitSampling()
-//      io.outsideAddrOri.valid #= false
-//    }
-//    clockDomain.waitSampling(10)
-//    io.ctrl.isOutSideWrite #= false
-//    clockDomain.waitSampling(10)
-//
-//    io.ctrl.isOutSideRead #= true
-//    clockDomain.waitSampling()
-//    for (i <- 0 until g.nttPoint / g.BI) {
-//      io.outsideAddrOri.valid #= true
-//      io.outsideIdxOri.valid #= true
-//      io.outsideAddrOri.payload.foreach(item => item #= i)
-//      clockDomain.waitSampling()
-//      io.outsideAddrOri.valid #= false
-//    }
-//    clockDomain.waitSampling(10)
-//    io.ctrl.isOutSideRead #= false
-//    clockDomain.waitSampling(10)
-//
-//    @volatile var flag = true
-//    val recIn = fork {
-//      val p_new = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/in_p1_new.txt")
-//      while (flag) {
-//        if (io.bfuIn(0).valid.toBoolean) {
-//          val flatSeq = io.bfuIn.map { item =>
-//            (item.payload.A.toBigInt, item.payload.B.toBigInt, item.payload.Tw.toBigInt)
-//          }
-//          flatSeq.map(p_new.println)
-//
-//          clockDomain.waitSampling()
-//        } else { clockDomain.waitSampling() }
-//      }
-//      p_new.close()
-//    }
-//    val recOut = fork {
-//      val p_new = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/out_p1_new.txt")
-//      while (flag) {
-//        if (io.bfuOut(0).valid.toBoolean) {
-//          val flatSeq = io.bfuOut.map { item => (item.payload.A.toBigInt, item.payload.B.toBigInt) }
-//          flatSeq.map(p_new.println)
-//
-//          clockDomain.waitSampling()
-//        } else { clockDomain.waitSampling() }
-//      }
-//      p_new.close()
-//    }
-//
-//    io.ctrl.isNtt #= true
-//    io.ctrl.isCal #= true
-//    clockDomain.waitSampling()
-//    io.start #= true
-//    clockDomain.waitSampling()
-//    io.start #= false
-//    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
-//    clockDomain.waitSampling(50)
-//    io.ctrl.isCal #= false
-//    clockDomain.waitSampling(20)
-//
-//    if (dut.io.idle.toBoolean) {
-//      flag = false
-//    }
-//    recIn.join()
-//    recOut.join()
-//    clockDomain.waitSampling(10)
-//
-//    @volatile var flag_intt = true
-//    val recinttIn = fork {
-//      val p_new = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/intt_in_p1_new.txt")
-//      while (flag_intt) {
-//        if (io.bfuIn(0).valid.toBoolean) {
-//
-//          val flatSeq = io.bfuIn.map { item =>
-//            (item.payload.A.toBigInt, item.payload.B.toBigInt, (g.Prime.toBigInt - item.payload.Tw.toBigInt))
-//          }
-//          flatSeq.map(p_new.println)
-//          clockDomain.waitSampling()
-//        } else { clockDomain.waitSampling() }
-//      }
-//      p_new.close()
-//    }
-//    val recinttOut = fork {
-//
-//      val p_new = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/intt_out_p1_new.txt")
-//      while (flag_intt) {
-//        if (io.bfuOut(0).valid.toBoolean) {
-//          val flatSeq = io.bfuOut.map { item => (item.payload.A.toBigInt, item.payload.B.toBigInt) }
-//          flatSeq.map(p_new.println)
-//
-//          clockDomain.waitSampling()
-//        } else { clockDomain.waitSampling() }
-//      }
-//      p_new.close()
-//    }
-//
-//    clockDomain.waitSampling(100)
-//    io.ctrl.isNtt #= false
-//    io.ctrl.isCal #= true
-//    clockDomain.waitSampling()
-//    io.start #= true
-//    clockDomain.waitSampling()
-//    io.start #= false
-//    clockDomain.waitActiveEdgeWhere(io.idle.toBoolean)
-//    clockDomain.waitSampling(20)
-//    io.ctrl.isCal #= false
-//    clockDomain.waitSampling(20)
-//    if (dut.io.idle.toBoolean) {
-//      flag_intt = false
-//    }
-//    recinttIn.join()
-//    recinttOut.join()
-//    clockDomain.waitSampling(10)
-//
-//    io.ctrl.isOutSideRead #= true
-//    clockDomain.waitSampling()
-//    for (i <- 0 until g.nttPoint / g.BI) {
-//      io.outsideAddrOri.valid #= true
-//      io.outsideIdxOri.valid #= true
-//      io.outsideAddrOri.payload.foreach(item => item #= i)
-//      io.outsideIdxOri.payload.zip(seq1).foreach { case (t1, t2) => t1 #= t2 }
-//      clockDomain.waitSampling()
-//      io.outsideAddrOri.valid #= false
-//    }
-//    clockDomain.waitSampling(10)
-//    io.ctrl.isOutSideRead #= false
-//    clockDomain.waitSampling(10)
-//    simSuccess()
-//  }
-//}
 
 object NttTopGenV extends App {
   SpinalConfig(
@@ -365,11 +198,11 @@ object NttTopGenV extends App {
 
 object NttTopVivadoFlow extends App {
   val g = NttCfgParam(
-    P = PrimeCfg(32, 20),
-    Bfu = BfuParamCfg(32, "v7", spiltMul = false),
+    P = PrimeCfg(64, 32),
+    Bfu = BfuParamCfg(64, "9eg", spiltMul = true),
     Arbit = ArbitParamCfg(),
-    nttPoint = 1024,
-    paraNum = 16,
+    nttPoint = 8192,
+    paraNum = 4,
     mode = modeCfg(nttSimPublic = false)
   )
   SpinalConfig(
