@@ -26,7 +26,7 @@ object CtrlOptAddrGenV extends App {
 
 object CtrlOptAddrSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim").compile(new CtrlOptAddr(NttCfgParam(nttPoint = 128, paraNum = 1,mode = modeCfg(useTwFile = false))))
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim").compile(new CtrlOptAddr(NttCfgParam(nttPoint = 64, paraNum = 4,mode = modeCfg(useTwFile = false))))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)
