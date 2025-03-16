@@ -75,7 +75,7 @@ object NttCfg {
     val BfuRegisterOutput = 1
     val MultIP = s"/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/mult_w${dspWidth}_${device}.xcix"
     val signedMultIP = s"/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/mult_w${dspWidth+1}_${device}_s.xcix"
-    val pathMultIP = Seq(MultIP,signedMultIP)
+    val pathMultIP = if(spiltMul){Seq(MultIP,signedMultIP)} else{Seq(MultIP)}
   }
 
   case class ArbitParamCfg() {
@@ -102,9 +102,7 @@ object NttCfg {
       mode: modeCfg = modeCfg(debug = false, nttSimPublic = true, useTwFile = true),
       nttPoint: Int = 1024,
       paraNum: Int = 4
-//      debug: Boolean = false,
-//      nttSimPublic: Boolean = true,
-//      useTwFile:Boolean = true
+
   ) {
     val nttPointList = Seq(512, 1024, 4096, 8192)
     if (mode.useTwFile) { require(nttPointList.contains(nttPoint), s"only support 512/1024/4096/8192 points") }
@@ -112,7 +110,6 @@ object NttCfg {
     val radix = 2
     val useBramIP = false
     val useMulIP = true
-//    val useTwFile = true
 
     val BfuLatencySt1 = Bfu.AddSubLatencyIntt
     val BfuLatencySt2 = Bfu.MultLatency + Bfu.FastModLatency

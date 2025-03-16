@@ -10,8 +10,37 @@ import spinal.lib.eda.xilinx.VivadoFlow
 
 import scala.collection.mutable
 
+object memInMuxVivadoFlow extends App {
+  val cfg = new NttCfgParam(paraNum = 8)
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new memInMux(cfg))
 
-object memOutArbVivadoFlow extends App{
+  val workspace = "NttOpt/fpga/DataPath/"
+  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
+  val family = "Virtex 7"
+  val device = "xc7vx485tffg1157-1"
+  val frequency = 300 MHz
+  val cpu = 16
+  val paths = Seq(
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/memInMux.v"
+  )
+  val rtl = new Rtl {
+
+    /** Name */
+    override def getName(): String = "memInMux"
+    override def getRtlPaths(): Seq[String] = paths
+  }
+  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
+  println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
+
+}
+
+object memOutArbVivadoFlow extends App {
   val cfg = new NttCfgParam(paraNum = 8)
   SpinalConfig(
     mode = Verilog,
@@ -28,7 +57,7 @@ object memOutArbVivadoFlow extends App{
   val frequency = 300 MHz
   val cpu = 16
   val paths = Seq(
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/memOutArb.v",
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/memOutArb.v"
   )
   val rtl = new Rtl {
 
@@ -41,7 +70,6 @@ object memOutArbVivadoFlow extends App{
 
 }
 
-
 object DataPathTopGenV extends App {
   SpinalConfig(
     mode = Verilog,
@@ -49,7 +77,7 @@ object DataPathTopGenV extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/DataPath",
     genLineComments = true
-  ).generate(new DataPathTop(NttCfgParam(paraNum = 16,mode = modeCfg(useTwFile = false))))
+  ).generate(new DataPathTop(NttCfgParam(paraNum = 16, mode = modeCfg(useTwFile = false))))
 }
 
 object DataPathTopVivadoFlow extends App {
@@ -91,9 +119,7 @@ object DataPathTopVivadoFlow extends App {
 
 }
 
-
-
-object NttTopVivadoFlow extends App {
+object shuffleOptVivadoFlow extends App {
   val g = NttCfgParam()
   val useIp = false
   val workspace = "NttOpt/fpga/DataPath/shuffleOpt"
@@ -105,13 +131,91 @@ object NttTopVivadoFlow extends App {
   val frequency = 300 MHz
   val cpu = 16
   val paths = Seq(
-    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/shuffleOpt.v",
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/shuffleOpt.v"
   )
   val rtl = new Rtl {
 
     /** Name */
     override def getName(): String = "shuffleOpt"
 
+    override def getRtlPaths(): Seq[String] = paths
+  }
+  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
+  println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
+
+}
+
+object memInArbOptSim extends App {
+  val cfg = new NttCfgParam(nttPoint = 32, paraNum = 4, mode = modeCfg(useTwFile = false))
+  val dut = SimConfig.withXSim.withWave.workspacePath("NttOpt/sim/DataPath").compile(new memInArbOpt(cfg))
+  dut.doSim("test") { dut =>
+    import dut._
+    clockDomain.forkStimulus(10 ns)
+    clockDomain.waitSampling(10)
+    for(i <- 0 until(32)){
+      io.addrOri.foreach(item => item #= BigInt(i >> 3))
+      io.idxOri.foreach(item => item #= (i%8))
+      io.dataOri #= i
+      clockDomain.waitSampling()
+    }
+    clockDomain.waitSampling(10)
+  }
+}
+
+object memInArbVivadoFlow extends App {
+  val cfg = new NttCfgParam(nttPoint = 1024,paraNum = 4)
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new memInArb(cfg))
+
+  val workspace = "NttOpt/fpga/DataPath/"
+  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
+  val family = "Virtex 7"
+  val device = "xc7vx485tffg1157-1"
+  val frequency = 300 MHz
+  val cpu = 16
+  val paths = Seq(
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/memInArb.v"
+  )
+  val rtl = new Rtl {
+
+    /** Name */
+    override def getName(): String = "memInArb"
+    override def getRtlPaths(): Seq[String] = paths
+  }
+  val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)
+  println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
+
+}
+
+
+object memInArbOptVivadoFlow extends App {
+  val cfg = new NttCfgParam(nttPoint = 1024,paraNum = 4)
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/DataPath",
+    genLineComments = true
+  ).generate(new memInArbOpt(cfg))
+
+  val workspace = "NttOpt/fpga/DataPath/"
+  val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
+  val family = "Virtex 7"
+  val device = "xc7vx485tffg1157-1"
+  val frequency = 300 MHz
+  val cpu = 16
+  val paths = Seq(
+    "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/DataPath/memInArbOpt.v"
+  )
+  val rtl = new Rtl {
+
+    /** Name */
+    override def getName(): String = "memInArbOpt"
     override def getRtlPaths(): Seq[String] = paths
   }
   val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu)

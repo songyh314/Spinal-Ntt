@@ -18,10 +18,10 @@ import scala.collection.mutable.ArrayBuffer
 object NttTopSim extends App {
   val period = 10
   val cfg = new NttCfgParam(
-    P = PrimeCfg(32, 20),
-    Bfu = BfuParamCfg(32, "v7",spiltMul = true),
+    P = PrimeCfg(14, 12),
+    Bfu = BfuParamCfg(14, "v7", spiltMul = false),
     Arbit = ArbitParamCfg(),
-    nttPoint = 4096,
+    nttPoint = 1024,
     paraNum = 4
   )
   val path = ArrayBuffer("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/IP/mul/")
@@ -51,7 +51,8 @@ object NttTopSim extends App {
     for (i <- 0 until g.nttPoint / g.BI) {
       io.outsideAddrOri.valid #= true
       io.outsideIdxOri.valid #= true
-      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
+//      (0 until g.BI).map { j => g.BI * i + j }.zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
+      (0 until g.BI).zip(io.outsideWrDataArray.payload).foreach { case (t1, t2) => t2 #= t1 }
       io.outsideAddrOri.payload.foreach(item => item #= i)
       io.outsideIdxOri.payload.zip(seq1).foreach { case (t1, t2) => t1 #= t2 }
       clockDomain.waitSampling()
@@ -185,7 +186,6 @@ object NttTopSim extends App {
   }
 }
 
-
 object NttTopGenV extends App {
   SpinalConfig(
     mode = Verilog,
@@ -244,6 +244,70 @@ object NttTopVivadoFlow extends App {
   println(s"${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
 }
 
+object NttTop_bw_scaledown_VivadoFlow extends App {
+  val prime = List((14,12))
+  val para = List(1,4,8,16)
+  val degree = List(1024)
+  val config = for {
+    a <- prime
+    b <- para
+    c <- degree
+  } yield (a, b, c)
+  val p = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/fpga/data/res.txt")
+  for (item <- config) {
+    val flag = item._1._1 > 24
+    val g = NttCfgParam(
+      P = PrimeCfg(item._1._1, item._1._2),
+      Bfu = BfuParamCfg(item._1._1, "v7", spiltMul = flag),
+      Arbit = ArbitParamCfg(),
+      nttPoint = item._3,
+      paraNum = item._2,
+      mode = modeCfg(nttSimPublic = false)
+    )
+    SpinalConfig(
+      mode = Verilog,
+      nameWhenByFile = false,
+      anonymSignalPrefix = "tmp",
+      targetDirectory = "NttOpt/rtl/NttTop_bw_scaledown",
+      genLineComments = true
+    ).generate(new NttTop_bw_scaledown(g))
+    val useIp = false
+    val workspace = "NttOpt/fpga/NttTop"
+    val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
+    val family = g.family
+    val device = g.device
+
+    val frequency = 300 MHz
+    val cpu = 16
+    val useWrapRom = false
+    val xcix = g.Bfu.pathMultIP
+
+    val paths = if (useWrapRom) {
+      Seq(
+        "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop_bw_scaledown/NttTop_bw_scaledown.v",
+        g.twFilePath
+      )
+    } else {
+      Seq(
+        "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop_bw_scaledown/NttTop_bw_scaledown.v",
+        "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop_bw_scaledown/NttTop_bw_scaledown.v_toplevel_ctrlMem_dut_tw_rom_rom.bin"
+      )
+    }
+    val rtl = new Rtl {
+
+      /** Name */
+      override def getName(): String = "NttTop_bw_scaledown"
+      override def getRtlPaths(): Seq[String] = paths
+    }
+    val flow = VivadoFlow(vivadopath, workspace, rtl, family, device, frequency, cpu, xcix = xcix)
+    println(s"prime = ${(item._1._1, item._1._2)}, degree = ${item._3}, para = ${item._2},${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} ")
+    p.println(
+      s"prime = ${(item._1._1, item._1._2)}, degree = ${item._3}, para = ${item._2},${family} -> ${(flow.getFMax / 1e6).toInt} MHz ${flow.getArea} "
+    )
+  }
+  p.close()
+}
+
 case class test_Case() {
   var A = 0
   var B = 0
@@ -265,5 +329,21 @@ object top_test {
     val p = new PrintWriter("/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/sim/data/test.txt")
     flatseq.foreach(p.println)
     p.close()
+  }
+}
+object test_comb {
+  def main(args: Array[String]): Unit = {
+    val prime = List((14, 12), (24, 14), (32, 20), (64, 32))
+    val para = List(4, 8, 16)
+    val degree = List(1024, 4096)
+    val config = for {
+      a <- prime
+      b <- para
+      c <- degree
+    } yield (a, b, c)
+//    println(config.mkString("\n"))
+    val m = config(0)._1._1
+    println(m)
+
   }
 }
