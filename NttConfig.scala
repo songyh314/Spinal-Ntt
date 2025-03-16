@@ -1,5 +1,5 @@
 package Ntt
-import Ntt.DataPath.DataDeMux
+
 import Ntt.NttCfg.NttCfgParam
 import spinal.core._
 import spinal.lib._
