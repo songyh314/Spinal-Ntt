@@ -135,9 +135,9 @@ case class spiltMult(g: NttCfgParam) extends Component {
   mulSumSt1 := (mul_A1B1 +^ mul_A0B0)
   mulSubSt2 := (mulSumSt1.asSInt - deltaMul).asUInt.resized
   val Res = Reg(cloneOf(io.dataOut.payload))
-  Res := (Delay(mul_A1B1,2) << g.width) + (mulSubSt2 << g.Bfu.dspWidth) + Delay(mul_A0B0,2)
+  Res := (Delay(mul_A1B1, 2) << g.width) + (mulSubSt2 << g.Bfu.dspWidth) + Delay(mul_A0B0, 2)
   io.dataOut.payload := Res
-  io.dataOut.valid := Delay(io.dataIn.valid,g.Bfu.MultLatency)
+  io.dataOut.valid := Delay(io.dataIn.valid, g.Bfu.MultLatency)
 }
 object spiltMult {
   def apply(dataIn: Flow[multPayload], g: NttCfgParam): Flow[UInt] = {

@@ -2,14 +2,9 @@ package Ntt.BFU
 
 import Ntt.NttCfg.{NttCfgParam, multPayload}
 import spinal.core._
-import spinal.core.sim._
 import spinal.lib._
-import spinal.lib.eda.bench.Rtl
-import spinal.lib.eda.xilinx.VivadoFlow
 
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
-import scala.util.Random
+
 
 class ModMult(g: NttCfgParam) extends Component {
   val io = new Bundle {
@@ -38,6 +33,5 @@ class ModMultCluster(g: NttCfgParam) extends Component {
     case 64 => FastMod6432(uMult.io.dataOut,g)
   }
   io.dataOut := ret
-//  uMod.io.dataIn := uMult.io.dataOut
-//  io.dataOut := uMod.io.dataOut
+
 }
