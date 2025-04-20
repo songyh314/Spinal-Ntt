@@ -26,7 +26,7 @@ object CtrlOptAddrGenV extends App {
 
 object CtrlOptAddrSim extends App {
   val period = 10
-  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim").compile(new CtrlOptAddr(NttCfgParam(nttPoint = 64, paraNum = 4,mode = modeCfg(useTwFile = false))))
+  val dut = SimConfig.withXSim.withWave.workspacePath("./NttOpt/sim").compile(new CtrlOptAddr(NttCfgParam(nttPoint = 16, paraNum = 4,mode = modeCfg(useTwFile = false))))
   dut.doSim("test") { dut =>
     import dut._
     SimTimeout(5000 * period)
@@ -53,6 +53,13 @@ object CtrlOptAddrSim extends App {
 
 
 object CtrlOptAddrVivadoFlow extends App {
+  SpinalConfig(
+    mode = Verilog,
+    nameWhenByFile = false,
+    anonymSignalPrefix = "tmp",
+    targetDirectory = "NttOpt/rtl/Ctrl",
+    genLineComments = true
+  ).generate(new CtrlOptAddr(NttCfgParam(P = PrimeCfg(14,12),paraNum = 4)))
   val workspace = "NttOpt/fpga/CtrlOptAddr"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
   val family = "Zynq UltraScale+ MPSoCS"

@@ -125,7 +125,7 @@ object DataPathTools {
 
 object Main extends App {
   import DataPathTools._
-  val constSeq = genSeq(8)
+  val constSeq = genSeq(16)
   val ret1 = (constSeq map insertAndFlip).flatten
   val ret2 = findIndex(ret1)
   println(ret1.mkString("\n"))

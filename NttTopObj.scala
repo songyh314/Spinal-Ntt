@@ -197,12 +197,13 @@ object NttTopGenV extends App {
 }
 
 object NttTopVivadoFlow extends App {
+  val d = 16
   val g = NttCfgParam(
-    P = PrimeCfg(64, 32),
-    Bfu = BfuParamCfg(64, "9eg", spiltMul = true),
+    P = PrimeCfg(14, 12),
+    Bfu = BfuParamCfg(14, "v7", spiltMul = false),
     Arbit = ArbitParamCfg(),
-    nttPoint = 8192,
-    paraNum = 4,
+    nttPoint = 1024,
+    paraNum = d,
     mode = modeCfg(nttSimPublic = false)
   )
   SpinalConfig(
@@ -211,9 +212,9 @@ object NttTopVivadoFlow extends App {
     anonymSignalPrefix = "tmp",
     targetDirectory = "NttOpt/rtl/NttTop1",
     genLineComments = true
-  ).generate(new NttTop(g))
+  ).generate(new NttTop_bw_scaledown(g))
   val useIp = false
-  val workspace = "NttOpt/fpga/NttTop"
+  val workspace = s"NttOpt/fpga/NttTop/q${14}_d${d}"
   val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
   val family = g.family
   val device = g.device
@@ -225,13 +226,13 @@ object NttTopVivadoFlow extends App {
 
   val paths = if (useWrapRom) {
     Seq(
-      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop.v",
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop_bw_scaledown.v",
       g.twFilePath
     )
   } else {
     Seq(
-      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop.v",
-      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop.v_toplevel_ctrlMem_dut_tw_rom_rom.bin"
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop_bw_scaledown.v",
+      "/PRJ/SpinalHDL-prj/PRJ/myTest/test/NttOpt/rtl/NttTop1/NttTop_bw_scaledown.v_toplevel_ctrlMem_dut_tw_rom_rom.bin"
     )
   }
   val rtl = new Rtl {
@@ -245,9 +246,9 @@ object NttTopVivadoFlow extends App {
 }
 
 object NttTop_bw_scaledown_VivadoFlow extends App {
-  val prime = List((14,12))
-  val para = List(1,4,8,16)
-  val degree = List(1024)
+  val prime = List((24,14))
+  val para = List(4,8,16)
+  val degree = List(4096)
   val config = for {
     a <- prime
     b <- para
@@ -272,7 +273,7 @@ object NttTop_bw_scaledown_VivadoFlow extends App {
       genLineComments = true
     ).generate(new NttTop_bw_scaledown(g))
     val useIp = false
-    val workspace = "NttOpt/fpga/NttTop"
+    val workspace = s"NttOpt/fpga/NttTop/q${item._1._1}_d${item._2}"
     val vivadopath = "/opt/Xilinx/Vivado/2023.1/bin"
     val family = g.family
     val device = g.device
